@@ -161,17 +161,22 @@ function updateModeBadges() {
   if (!state.capabilities) return;
   const { modes } = state.capabilities;
 
-  function setBadge(id, subId, available, label) {
+  function setBadge(id, available) {
     const badge = document.getElementById(id);
-    const sub   = document.getElementById(subId);
     if (!badge) return;
     badge.className = `metric-badge ${available ? 'badge-available' : 'badge-unavailable'}`;
     badge.textContent = available ? 'Available' : 'Not Available';
   }
 
-  setBadge('ov-classical-badge', 'ov-classical-sub', modes.classical.available);
-  setBadge('ov-pqc-badge',       'ov-pqc-sub',       modes.pqc.available);
-  setBadge('ov-hybrid-badge',    'ov-hybrid-sub',     modes.hybrid.available);
+  setBadge('ov-classical-badge', modes.classical.available);
+  setBadge('ov-pqc-badge',       modes.pqc.available);
+
+  // Hybrid — always show as Coming Soon regardless of system API
+  const hybridBadge = document.getElementById('ov-hybrid-badge');
+  if (hybridBadge) {
+    hybridBadge.className = 'metric-badge badge-coming-soon';
+    hybridBadge.textContent = 'Coming Soon';
+  }
 }
 
 function updateSidebarStatus(online, version = '') {
@@ -197,7 +202,8 @@ function updateModeButtons() {
   if (!state.capabilities) return;
   const { modes } = state.capabilities;
 
-  ['classical', 'pqc', 'hybrid'].forEach(mode => {
+  // Classical and PQC — respect API availability
+  ['classical', 'pqc'].forEach(mode => {
     const btn = document.getElementById(`mode-btn-${mode}`);
     const tag = document.getElementById(`mode-tag-${mode}`);
     if (!btn || !tag) return;
@@ -212,6 +218,16 @@ function updateModeButtons() {
       btn.classList.remove('disabled-mode');
     }
   });
+
+  // Hybrid — always shown as Coming Soon / unavailable regardless of API
+  const hybridBtn = document.getElementById('mode-btn-hybrid');
+  const hybridTag = document.getElementById('mode-tag-hybrid');
+  if (hybridBtn && hybridTag) {
+    hybridTag.textContent = 'Coming Soon';
+    hybridTag.className = 'mode-status-tag unavail';
+    hybridBtn.classList.add('disabled-mode');
+    hybridBtn.disabled = true;
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -321,6 +337,15 @@ async function startExperiment() {
       successBox.style.display = 'block';
     }
 
+    // ── Auto-refresh history so new run appears immediately ──────────────
+    // Reset filter to 'All modes' so every experiment type is visible
+    const histFilter = document.getElementById('history-filter-mode');
+    if (histFilter) histFilter.value = '';
+    // If history page is active, reload it; otherwise just prime the data
+    if (state.currentPage === 'history') {
+      loadHistory();
+    }
+
   } catch (err) {
     setProgressBar(0, 'Error');
     errorBox.style.display = 'block';
@@ -362,12 +387,15 @@ async function loadComparison() {
   } catch (err) {
     tableWrap.innerHTML = `<div class="alert alert-error">Failed to load: ${err.message}</div>`;
   }
+
+  // Load history-based time-series charts (classical vs PQC over time)
+  await loadHistoryCharts();
 }
 
 function renderComparisonTable(data) {
   const wrap = document.getElementById('compare-table-wrap');
   const modes = ['classical', 'pqc', 'hybrid'];
-  const hasAny = modes.some(m => data[m]?.mean_latency_ms != null);
+  const hasAny = modes.some(m => data[m]?.mean_latency_ms != null || data[m]?.success_rate_pct != null);
 
   if (!hasAny) {
     wrap.innerHTML = '<div class="empty-state">No data yet — run experiments for each mode first.</div>';
@@ -380,6 +408,7 @@ function renderComparisonTable(data) {
     <thead>
       <tr>
         <th>Mode</th>
+        <th>Experiments</th>
         <th>Mean Latency</th>
         <th>Median</th>
         <th>Std Dev</th>
@@ -395,7 +424,8 @@ function renderComparisonTable(data) {
   modes.forEach(m => {
     const d = data[m];
     if (!d) return;
-    const noData = d.mean_latency_ms == null;
+    const noLatency = d.mean_latency_ms == null;
+    const isFailed  = d.success_rate_pct === 0 || d.success_rate_pct === 0.0;
     const overhead = d.latency_overhead_pct;
     let overheadHTML = '—';
     if (overhead != null) {
@@ -406,9 +436,19 @@ function renderComparisonTable(data) {
       overheadHTML = '<span class="td-neutral">baseline</span>';
     }
 
+    const expCount = d.experiment_count != null ? `${d.experiment_count} run${d.experiment_count !== 1 ? 's' : ''}` : '1 run';
+
+    // For hybrid: show system limitation note if failed
+    const latencyCell = noLatency
+      ? (isFailed && m === 'hybrid'
+          ? '<span class="td-neutral" title="Hybrid requires oqs-provider (OpenSSL 3.x)">N/A ⚠</span>'
+          : '<span class="td-neutral">No data</span>')
+      : fmtMs(d.mean_latency_ms);
+
     html += `<tr>
       <td class="td-mode"><span class="tag ${tagClass[m]}">${m}</span></td>
-      <td>${noData ? '<span class="td-neutral">No data</span>' : fmtMs(d.mean_latency_ms)}</td>
+      <td style="font-size:11px;color:#64748b">${expCount}</td>
+      <td>${latencyCell}</td>
       <td>${fmtMs(d.median_latency_ms)}</td>
       <td>${fmtMs(d.std_latency_ms)}</td>
       <td>${d.min_latency_ms != null ? fmtMs(d.min_latency_ms) + ' / ' + fmtMs(d.max_latency_ms) : '—'}</td>
@@ -425,18 +465,37 @@ function renderComparisonTable(data) {
   if (!data.classical?.mean_latency_ms) {
     html += '<div class="alert alert-info" style="margin-top:12px">Run a <strong>Classical</strong> experiment first to see overhead comparisons against the baseline.</div>';
   }
+  if (data.hybrid?.success_rate_pct === 0) {
+    html += `<div class="alert alert-info" style="margin-top:12px">
+      <strong>⚠ Hybrid mode (Mode C)</strong> requires OpenSSL 3.x with <code>oqs-provider</code> installed.
+      Without it, hybrid handshakes cannot negotiate ML-KEM-768 and all runs fail.
+      The chart shows 0% to highlight this system limitation.
+    </div>`;
+  }
 
   wrap.innerHTML = html;
 }
 
 function renderCharts(data) {
-  const modes   = ['classical', 'pqc', 'hybrid'];
-  const labels  = ['Mode A — Classical', 'Mode B — PQC', 'Mode C — Hybrid'];
-  const colors  = ['#2563eb', '#0284c7', '#7c3aed'];
-  const colorsA = ['rgba(37,99,235,0.18)', 'rgba(2,132,199,0.18)', 'rgba(124,58,237,0.18)'];
+  // Only show classical and pqc — hybrid is coming soon
+  const modes   = ['classical', 'pqc'];
+  const labels  = ['Mode A — Classical (X25519)', 'Mode B — PQC (ML-KEM-768)'];
+  const colors  = ['#2563eb', '#059669'];
+  const colorsA = ['rgba(37,99,235,0.15)', 'rgba(5,150,105,0.15)'];
 
-  // Latency chart (bar)
-  const latencyVals = modes.map(m => data[m]?.mean_latency_ms ?? null);
+  function latencyVal(m) {
+    const d = data[m];
+    if (!d) return null;
+    return d.mean_latency_ms ?? null;
+  }
+
+  function successVal(m) {
+    const d = data[m];
+    if (!d) return null;
+    return d.success_rate_pct ?? null;
+  }
+
+  const latencyVals = modes.map(latencyVal);
   const stdVals     = modes.map(m => data[m]?.std_latency_ms ?? 0);
 
   renderBarChart('chart-latency', labels, [{
@@ -445,7 +504,6 @@ function renderCharts(data) {
     backgroundColor: colorsA,
     borderColor: colors,
     borderWidth: 2,
-    errorBars: stdVals,
   }], 'ms');
 
   // Bytes chart
@@ -459,7 +517,7 @@ function renderCharts(data) {
   }], 'bytes');
 
   // Success rate chart
-  const successVals = modes.map(m => data[m]?.success_rate_pct ?? null);
+  const successVals = modes.map(successVal);
   renderBarChart('chart-success', labels, [{
     label: 'Success Rate (%)',
     data: successVals,
@@ -468,16 +526,199 @@ function renderCharts(data) {
     borderWidth: 2,
   }], '%', 100);
 
-  // Overhead chart (exclude baseline)
-  const overheadLabels = ['Mode B — PQC', 'Mode C — Hybrid'];
-  const overheadData   = [data.pqc?.latency_overhead_pct, data.hybrid?.latency_overhead_pct];
-  renderBarChart('chart-overhead', overheadLabels, [{
+  // Overhead chart — PQC only vs classical baseline
+  const overheadData = [data.pqc?.latency_overhead_pct ?? null];
+  renderBarChart('chart-overhead', ['Mode B — PQC (ML-KEM-768)'], [{
     label: 'Latency Overhead vs. Classical (%)',
     data: overheadData,
     backgroundColor: overheadData.map(v => v == null ? 'rgba(100,116,139,0.15)' : v > 0 ? 'rgba(220,38,38,0.18)' : 'rgba(22,163,74,0.18)'),
-    borderColor:     overheadData.map(v => v == null ? '#94a3b8'              : v > 0 ? '#dc2626'               : '#16a34a'),
+    borderColor:     overheadData.map(v => v == null ? '#94a3b8' : v > 0 ? '#dc2626' : '#16a34a'),
     borderWidth: 2,
   }], '%');
+}
+
+// ─── History-based time-series charts ────────────────────────────────────────
+async function loadHistoryCharts() {
+  const section = document.getElementById('history-charts-section');
+  if (!section) return;
+
+  section.innerHTML = '<div class="loading-row"><span class="spinner"></span> Loading history charts…</div>';
+
+  try {
+    const data = await apiFetch('/api/experiments/?limit=200');
+    const experiments = data.experiments || [];
+
+    const classical = experiments
+      .filter(e => e.mode === 'classical' && e.status === 'completed' && e.mean_latency_ms != null)
+      .reverse();  // oldest first
+    const pqc = experiments
+      .filter(e => e.mode === 'pqc' && e.status === 'completed' && e.mean_latency_ms != null)
+      .reverse();
+
+    if (!classical.length && !pqc.length) {
+      section.innerHTML = '<div class="empty-state">No completed experiments yet — run Classical and PQC benchmarks to see time-series charts.</div>';
+      return;
+    }
+
+    section.innerHTML = `
+      <div class="card chart-card-wide">
+        <div class="card-title">Latency Per Run — Classical vs PQC Over Time <span class="card-hint">chronological order</span></div>
+        <canvas id="chart-history-latency" height="90"></canvas>
+      </div>
+      <div class="chart-grid" style="margin-top:0">
+        <div class="card chart-card">
+          <div class="card-title">Latency Distribution <span class="card-hint">Box-style — min/mean/max per mode</span></div>
+          <canvas id="chart-history-dist"></canvas>
+        </div>
+        <div class="card chart-card">
+          <div class="card-title">Success Rate Per Run <span class="card-hint">Classical vs PQC</span></div>
+          <canvas id="chart-history-success"></canvas>
+        </div>
+      </div>`;
+
+    // 1) Line chart: latency per run over time
+    const classicalLabels = classical.map((e, i) => `C-${i + 1}`);
+    const pqcLabels       = pqc.map((e, i) => `P-${i + 1}`);
+
+    // Build a unified x-axis by experiment index
+    const maxLen = Math.max(classical.length, pqc.length);
+    const timeLabels = Array.from({ length: maxLen }, (_, i) => `Run ${i + 1}`);
+
+    const classicalPadded = Array.from({ length: maxLen }, (_, i) =>
+      classical[i] ? classical[i].mean_latency_ms : null);
+    const pqcPadded = Array.from({ length: maxLen }, (_, i) =>
+      pqc[i] ? pqc[i].mean_latency_ms : null);
+
+    if (state.charts['chart-history-latency']) state.charts['chart-history-latency'].destroy();
+    state.charts['chart-history-latency'] = new Chart(
+      document.getElementById('chart-history-latency'),
+      {
+        type: 'line',
+        data: {
+          labels: timeLabels,
+          datasets: [
+            {
+              label: 'Classical (X25519)',
+              data: classicalPadded,
+              borderColor: '#2563eb',
+              backgroundColor: 'rgba(37,99,235,0.08)',
+              pointBackgroundColor: '#2563eb',
+              pointRadius: 4,
+              pointHoverRadius: 6,
+              tension: 0.3,
+              fill: true,
+              spanGaps: true,
+            },
+            {
+              label: 'PQC (ML-KEM-768)',
+              data: pqcPadded,
+              borderColor: '#059669',
+              backgroundColor: 'rgba(5,150,105,0.08)',
+              pointBackgroundColor: '#059669',
+              pointRadius: 4,
+              pointHoverRadius: 6,
+              tension: 0.3,
+              fill: true,
+              spanGaps: true,
+            },
+          ],
+        },
+        options: {
+          ...CHART_DEFAULTS,
+          responsive: true,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            ...CHART_DEFAULTS.plugins,
+            tooltip: {
+              ...CHART_DEFAULTS.plugins.tooltip,
+              callbacks: {
+                label: ctx => ctx.raw != null ? `${ctx.dataset.label}: ${ctx.raw.toFixed(2)} ms` : 'No data',
+              },
+            },
+          },
+          scales: {
+            x: { ...CHART_DEFAULTS.scales.x, title: { display: true, text: 'Experiment Run (oldest → newest)', color: '#64748b', font: { size: 10 } } },
+            y: { ...CHART_DEFAULTS.scales.y, beginAtZero: true, title: { display: true, text: 'Mean Latency (ms)', color: '#64748b', font: { size: 10 } } },
+          },
+        },
+      }
+    );
+
+    // 2) Min/Mean/Max distribution bar chart
+    const distLabels = ['Classical (X25519)', 'PQC (ML-KEM-768)'];
+    const meanVals = [
+      classical.length ? classical.reduce((s, e) => s + e.mean_latency_ms, 0) / classical.length : null,
+      pqc.length       ? pqc.reduce((s, e) => s + e.mean_latency_ms, 0) / pqc.length             : null,
+    ];
+    const minVals = [
+      classical.length ? Math.min(...classical.map(e => e.min_latency_ms ?? e.mean_latency_ms)) : null,
+      pqc.length       ? Math.min(...pqc.map(e => e.min_latency_ms ?? e.mean_latency_ms))       : null,
+    ];
+    const maxVals = [
+      classical.length ? Math.max(...classical.map(e => e.max_latency_ms ?? e.mean_latency_ms)) : null,
+      pqc.length       ? Math.max(...pqc.map(e => e.max_latency_ms ?? e.mean_latency_ms))       : null,
+    ];
+
+    if (state.charts['chart-history-dist']) state.charts['chart-history-dist'].destroy();
+    state.charts['chart-history-dist'] = new Chart(
+      document.getElementById('chart-history-dist'),
+      {
+        type: 'bar',
+        data: {
+          labels: distLabels,
+          datasets: [
+            { label: 'Min Latency (ms)', data: minVals, backgroundColor: ['rgba(37,99,235,0.2)', 'rgba(5,150,105,0.2)'], borderColor: ['#2563eb','#059669'], borderWidth: 2 },
+            { label: 'Mean Latency (ms)', data: meanVals, backgroundColor: ['rgba(37,99,235,0.55)', 'rgba(5,150,105,0.55)'], borderColor: ['#2563eb','#059669'], borderWidth: 2 },
+            { label: 'Max Latency (ms)', data: maxVals, backgroundColor: ['rgba(37,99,235,0.1)', 'rgba(5,150,105,0.1)'], borderColor: ['#93c5fd','#6ee7b7'], borderWidth: 2, borderDash: [4,3] },
+          ],
+        },
+        options: {
+          ...CHART_DEFAULTS,
+          responsive: true,
+          plugins: { ...CHART_DEFAULTS.plugins, tooltip: { ...CHART_DEFAULTS.plugins.tooltip, callbacks: { label: ctx => ctx.raw != null ? `${ctx.dataset.label}: ${ctx.raw.toFixed(2)} ms` : 'No data' } } },
+          scales: {
+            x: { ...CHART_DEFAULTS.scales.x },
+            y: { ...CHART_DEFAULTS.scales.y, beginAtZero: true, title: { display: true, text: 'ms', color: '#64748b', font: { size: 10 } } },
+          },
+        },
+      }
+    );
+
+    // 3) Success rate per run
+    const srClassical = classical.map(e => e.success_rate_pct ?? null);
+    const srPqc       = pqc.map(e => e.success_rate_pct ?? null);
+    const srMax       = Math.max(classical.length, pqc.length);
+    const srLabels    = Array.from({ length: srMax }, (_, i) => `Run ${i + 1}`);
+    const srCPad      = Array.from({ length: srMax }, (_, i) => srClassical[i] ?? null);
+    const srPPad      = Array.from({ length: srMax }, (_, i) => srPqc[i] ?? null);
+
+    if (state.charts['chart-history-success']) state.charts['chart-history-success'].destroy();
+    state.charts['chart-history-success'] = new Chart(
+      document.getElementById('chart-history-success'),
+      {
+        type: 'line',
+        data: {
+          labels: srLabels,
+          datasets: [
+            { label: 'Classical Success Rate (%)', data: srCPad, borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,0.08)', pointRadius: 4, tension: 0.2, fill: false, spanGaps: true },
+            { label: 'PQC Success Rate (%)',       data: srPPad, borderColor: '#059669', backgroundColor: 'rgba(5,150,105,0.08)', pointRadius: 4, tension: 0.2, fill: false, spanGaps: true },
+          ],
+        },
+        options: {
+          ...CHART_DEFAULTS,
+          responsive: true,
+          plugins: { ...CHART_DEFAULTS.plugins, tooltip: { ...CHART_DEFAULTS.plugins.tooltip, callbacks: { label: ctx => ctx.raw != null ? `${ctx.dataset.label}: ${ctx.raw.toFixed(1)}%` : 'No data' } } },
+          scales: {
+            x: { ...CHART_DEFAULTS.scales.x, title: { display: true, text: 'Experiment Run', color: '#64748b', font: { size: 10 } } },
+            y: { ...CHART_DEFAULTS.scales.y, min: 0, max: 100, title: { display: true, text: '%', color: '#64748b', font: { size: 10 } } },
+          },
+        },
+      }
+    );
+
+  } catch (err) {
+    if (section) section.innerHTML = `<div class="alert alert-error">Failed to load history charts: ${err.message}</div>`;
+  }
 }
 
 function renderBarChart(canvasId, labels, datasets, unit, suggestedMax = undefined) {
@@ -534,6 +775,7 @@ async function exportResults(fmt) {
 // ═══════════════════════════════════════════════════════════════════════════
 async function loadHistory() {
   const wrap = document.getElementById('history-table-wrap');
+  if (!wrap) return;
   wrap.innerHTML = '<div class="loading-row"><span class="spinner"></span> Loading…</div>';
 
   const modeFilter = document.getElementById('history-filter-mode')?.value || '';

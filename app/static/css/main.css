@@ -235,6 +235,7 @@ body { display: flex; min-height: 100vh; background: #ffffff; }
 
 .badge-available  { background: #dcfce7; color: #15803d; border-color: #bbf7d0; }
 .badge-unavailable{ background: #fee2e2; color: #b91c1c; border-color: #fecaca; }
+.badge-coming-soon{ background: #fef3c7; color: #92400e; border-color: #fde68a; }
 .badge-available-inline {
   display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600;
   background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0;
@@ -524,6 +525,8 @@ tr:hover td { background: #f8fafc; }
 @media (max-width: 900px) { .chart-grid { grid-template-columns: 1fr; } }
 
 .chart-card { position: relative; }
+.chart-card-wide { position: relative; margin-bottom: 20px; }
+.chart-card-wide canvas { max-height: 320px; }
 canvas { max-height: 260px; }
 
 /* ── Formula Box ─────────────────────────────────────────────────────────── */
