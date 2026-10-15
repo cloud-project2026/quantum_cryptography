@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PQC Migration Platform — TLS Performance Benchmark</title>
+  <meta name="description" content="Post-Quantum Cryptography Migration: A Cloud-Based TLS Performance Evaluation Platform for comparing classical, post-quantum, and hybrid TLS key exchange algorithms." />
+
+  <!-- Google Fonts: Inter for clean, modern legibility -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <!-- Chart.js for interactive charts -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+
+  <link rel="stylesheet" href="/static/css/main.css" />
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     SIDEBAR NAVIGATION
+═══════════════════════════════════════════════════════════════════════════ -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon">⚛</div>
+    <div class="logo-text">
+      <span class="logo-title">PQC Lab</span>
+      <span class="logo-sub">v1.0.0</span>
+    </div>
+  </div>
+
+  <nav class="sidebar-nav">
+    <button class="nav-item active" data-page="overview" id="nav-overview">
+      <span class="nav-icon">◈</span>
+      <span>Overview</span>
+    </button>
+    <button class="nav-item" data-page="run" id="nav-run">
+      <span class="nav-icon">▶</span>
+      <span>Run Experiment</span>
+    </button>
+    <button class="nav-item" data-page="compare" id="nav-compare">
+      <span class="nav-icon">⊞</span>
+      <span>Compare Results</span>
+    </button>
+    <button class="nav-item" data-page="history" id="nav-history">
+      <span class="nav-icon">◷</span>
+      <span>History</span>
+    </button>
+    <button class="nav-item" data-page="system" id="nav-system">
+      <span class="nav-icon">⚙</span>
+      <span>System Info</span>
+    </button>
+    <button class="nav-item" data-page="learn" id="nav-learn">
+      <span class="nav-icon">◎</span>
+      <span>Learn</span>
+    </button>
+  </nav>
+
+  <div class="sidebar-status" id="sidebar-status">
+    <div class="status-dot" id="status-dot"></div>
+    <span id="status-text">Connecting…</span>
+  </div>
+</aside>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     MAIN CONTENT
+═══════════════════════════════════════════════════════════════════════════ -->
+<main class="main-content" id="main-content">
+
+  <!-- ── PAGE: OVERVIEW ─────────────────────────────────────────────────── -->
+  <section class="page active" id="page-overview">
+    <div class="page-header">
+      <h1>Post-Quantum Cryptography Migration Platform</h1>
+      <p class="page-sub">TLS Performance Evaluation: Classical vs. Post-Quantum vs. Hybrid Key Exchange</p>
+    </div>
+
+    <!-- Server status banner -->
+    <div class="status-banner" id="overview-banner">
+      <div class="banner-left">
+        <div class="banner-dot pulse" id="banner-dot"></div>
+        <span id="banner-status-text">Checking server…</span>
+      </div>
+      <div class="banner-right">
+        <span id="banner-openssl"></span>
+      </div>
+    </div>
+
+    <!-- Metric cards -->
+    <div class="card-grid">
+      <div class="metric-card">
+        <div class="metric-label">Total Experiments</div>
+        <div class="metric-value" id="ov-total">—</div>
+        <div class="metric-sub">all time</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Classical Mode</div>
+        <div class="metric-badge badge-available" id="ov-classical-badge">Available</div>
+        <div class="metric-sub" id="ov-classical-sub">TLS 1.3 / X25519</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">PQC Mode</div>
+        <div class="metric-badge" id="ov-pqc-badge">Checking…</div>
+        <div class="metric-sub" id="ov-pqc-sub">ML-KEM-768</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Hybrid Mode</div>
+        <div class="metric-badge" id="ov-hybrid-badge">Checking…</div>
+        <div class="metric-sub" id="ov-hybrid-sub">X25519 + ML-KEM-768</div>
+      </div>
+    </div>
+
+    <!-- Latest experiment card -->
+    <div class="card" id="latest-experiment-card">
+      <div class="card-title">Latest Experiment</div>
+      <div id="latest-experiment-body">
+        <div class="empty-state">No experiments run yet. Go to <strong>Run Experiment</strong> to start.</div>
+      </div>
+    </div>
+
+    <!-- Quick-start guide -->
+    <div class="card">
+      <div class="card-title">Quick Start</div>
+      <ol class="quick-start-list">
+        <li>Check <strong>System Info</strong> to see which cryptographic modes are available.</li>
+        <li>Go to <strong>Run Experiment</strong>, select a mode, and click <em>Start Benchmark</em>.</li>
+        <li>View results in <strong>Compare Results</strong> with latency, byte size, and overhead charts.</li>
+        <li>Export your data as CSV or JSON from the Compare Results page.</li>
+        <li>To enable Post-Quantum modes, see <strong>System Info</strong> → Setup Instructions.</li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- ── PAGE: RUN EXPERIMENT ───────────────────────────────────────────── -->
+  <section class="page" id="page-run">
+    <div class="page-header">
+      <h1>Run Experiment</h1>
+      <p class="page-sub">Configure and launch a TLS handshake benchmark. Results are saved automatically.</p>
+    </div>
+
+    <div class="two-col">
+      <!-- Configuration panel -->
+      <div class="card config-card">
+        <div class="card-title">Experiment Configuration</div>
+
+        <!-- Mode selector -->
+        <div class="form-group">
+          <label class="form-label" for="cfg-mode">Cryptographic Mode</label>
+          <div class="mode-selector" id="mode-selector">
+            <button class="mode-btn active" data-mode="classical" id="mode-btn-classical">
+              <span class="mode-icon">🔐</span>
+              <span class="mode-name">Mode A — Classical</span>
+              <span class="mode-algo">X25519 / TLS 1.3</span>
+              <span class="mode-status-tag" id="mode-tag-classical">Available</span>
+            </button>
+            <button class="mode-btn" data-mode="pqc" id="mode-btn-pqc">
+              <span class="mode-icon">⚛</span>
+              <span class="mode-name">Mode B — Post-Quantum</span>
+              <span class="mode-algo">ML-KEM-768</span>
+              <span class="mode-status-tag" id="mode-tag-pqc">Checking…</span>
+            </button>
+            <button class="mode-btn" data-mode="hybrid" id="mode-btn-hybrid">
+              <span class="mode-icon">🛡</span>
+              <span class="mode-name">Mode C — Hybrid</span>
+              <span class="mode-algo">X25519 + ML-KEM-768</span>
+              <span class="mode-status-tag" id="mode-tag-hybrid">Checking…</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Mode description -->
+        <div class="mode-description" id="mode-description">
+          <strong>Mode A — Classical TLS (X25519):</strong>
+          Standard TLS 1.3 using X25519 elliptic-curve key exchange. This is the current internet standard.
+          Fast and universally supported. Vulnerable to sufficiently powerful quantum computers.
+        </div>
+
+        <!-- PQC unavailable warning -->
+        <div class="alert alert-warning" id="pqc-unavailable-warning" style="display:none">
+          <strong>⚠ This mode is not available on this system.</strong>
+          <p id="pqc-unavailable-detail"></p>
+          <p>See <strong>System Info</strong> for setup instructions.</p>
+        </div>
+
+        <!-- Form fields -->
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="cfg-host">Target Host</label>
+            <select class="form-control" id="cfg-host">
+              <option value="127.0.0.1">127.0.0.1 (Local loopback server)</option>
+              <option value="localhost">localhost (Local loopback server)</option>
+              <option value="example.com">example.com (Internet — classical only)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="cfg-port">Port</label>
+            <input class="form-control" type="number" id="cfg-port" value="54443" min="1" max="65535" />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="cfg-reps">Repetitions <span class="form-hint">(1–200)</span></label>
+            <input class="form-control" type="number" id="cfg-reps" value="10" min="1" max="200" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="cfg-conc">Concurrency <span class="form-hint">(1–20)</span></label>
+            <input class="form-control" type="number" id="cfg-conc" value="1" min="1" max="20" />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="cfg-warmup">Warm-up Runs <span class="form-hint">(0–20)</span></label>
+            <input class="form-control" type="number" id="cfg-warmup" value="2" min="0" max="20" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="cfg-timeout">Timeout (seconds)</label>
+            <input class="form-control" type="number" id="cfg-timeout" value="10" min="0.5" max="60" step="0.5" />
+          </div>
+        </div>
+
+        <button class="btn btn-primary btn-lg" id="start-btn" onclick="startExperiment()">
+          <span id="start-btn-text">▶ Start Benchmark</span>
+        </button>
+      </div>
+
+      <!-- Results preview panel -->
+      <div class="card" id="run-results-card">
+        <div class="card-title">Experiment Progress</div>
+        <div id="run-status-panel">
+          <div class="empty-state">Configure an experiment and click <strong>Start Benchmark</strong>.</div>
+        </div>
+
+        <!-- Live result display -->
+        <div id="run-live-results" style="display:none">
+          <div class="progress-container">
+            <div class="progress-label">
+              <span id="progress-text">Running…</span>
+              <span id="progress-pct">0%</span>
+            </div>
+            <div class="progress-bar-wrap">
+              <div class="progress-bar" id="progress-bar" style="width:0%"></div>
+            </div>
+          </div>
+
+          <div class="result-grid" id="run-result-grid">
+            <div class="result-item">
+              <div class="result-label">Status</div>
+              <div class="result-val" id="res-status">—</div>
+            </div>
+            <div class="result-item">
+              <div class="result-label">Mean Latency</div>
+              <div class="result-val" id="res-mean">—</div>
+            </div>
+            <div class="result-item">
+              <div class="result-label">Median Latency</div>
+              <div class="result-val" id="res-median">—</div>
+            </div>
+            <div class="result-item">
+              <div class="result-label">Min / Max</div>
+              <div class="result-val" id="res-minmax">—</div>
+            </div>
+            <div class="result-item">
+              <div class="result-label">Success Rate</div>
+              <div class="result-val" id="res-success">—</div>
+            </div>
+            <div class="result-item">
+              <div class="result-label">TLS Version</div>
+              <div class="result-val" id="res-tls-ver">—</div>
+            </div>
+            <div class="result-item">
+              <div class="result-label">Negotiated Group</div>
+              <div class="result-val" id="res-group">—</div>
+            </div>
+            <div class="result-item">
+              <div class="result-label">OpenSSL</div>
+              <div class="result-val" id="res-openssl">—</div>
+            </div>
+          </div>
+
+          <div class="alert alert-error" id="run-error-box" style="display:none">
+            <strong>Experiment Error</strong>
+            <p id="run-error-detail"></p>
+          </div>
+
+          <div class="alert alert-info" id="run-success-box" style="display:none">
+            <strong>✓ Experiment Complete</strong>
+            <p>Results saved. View in <a href="#" onclick="showPage('compare')">Compare Results</a>.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── PAGE: COMPARE RESULTS ─────────────────────────────────────────── -->
+  <section class="page" id="page-compare">
+    <div class="page-header">
+      <h1>Compare Results</h1>
+      <p class="page-sub">Side-by-side comparison of TLS key-exchange performance across all three modes.</p>
+    </div>
+
+    <div class="toolbar">
+      <button class="btn btn-secondary" onclick="loadComparison()">↻ Refresh</button>
+      <button class="btn btn-secondary" onclick="exportResults('csv')">⬇ Export CSV</button>
+      <button class="btn btn-secondary" onclick="exportResults('json')">⬇ Export JSON</button>
+    </div>
+
+    <!-- Summary table -->
+    <div class="card">
+      <div class="card-title">Performance Summary</div>
+      <div class="table-wrap" id="compare-table-wrap">
+        <div class="empty-state">No data yet — run at least one experiment first.</div>
+      </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="chart-grid">
+      <div class="card chart-card">
+        <div class="card-title">Handshake Latency (ms) <span class="card-hint">Mean ± Std</span></div>
+        <canvas id="chart-latency"></canvas>
+      </div>
+      <div class="card chart-card">
+        <div class="card-title">Bytes Transferred <span class="card-hint">Application-layer</span></div>
+        <canvas id="chart-bytes"></canvas>
+      </div>
+      <div class="card chart-card">
+        <div class="card-title">Success Rate (%)</div>
+        <canvas id="chart-success"></canvas>
+      </div>
+      <div class="card chart-card">
+        <div class="card-title">Overhead vs. Classical Baseline (%)</div>
+        <canvas id="chart-overhead"></canvas>
+      </div>
+    </div>
+
+    <!-- Overhead note -->
+    <div class="card">
+      <div class="card-title">Overhead Formula</div>
+      <div class="formula-box">
+        <code>Overhead (%) = ((alternative_metric − classical_metric) / classical_metric) × 100</code>
+      </div>
+      <p class="card-note">Negative overhead = the alternative is <strong>faster</strong> than classical (an improvement).
+      Comparison is only meaningful when all modes were tested against the same target host and network conditions.</p>
+    </div>
+  </section>
+
+  <!-- ── PAGE: HISTORY ─────────────────────────────────────────────────── -->
+  <section class="page" id="page-history">
+    <div class="page-header">
+      <h1>Experiment History</h1>
+      <p class="page-sub">All past benchmark runs. Click a row to view detailed handshake-level results.</p>
+    </div>
+
+    <div class="toolbar">
+      <select class="form-control form-control-sm" id="history-filter-mode" onchange="loadHistory()">
+        <option value="">All modes</option>
+        <option value="classical">Classical</option>
+        <option value="pqc">PQC</option>
+        <option value="hybrid">Hybrid</option>
+      </select>
+      <button class="btn btn-secondary" onclick="loadHistory()">↻ Refresh</button>
+    </div>
+
+    <div class="card">
+      <div class="table-wrap" id="history-table-wrap">
+        <div class="empty-state">No experiments yet.</div>
+      </div>
+    </div>
+
+    <!-- Experiment detail modal -->
+    <div class="modal-overlay" id="history-modal" style="display:none" onclick="closeHistoryModal(event)">
+      <div class="modal-box">
+        <div class="modal-header">
+          <h2 id="modal-title">Experiment Detail</h2>
+          <button class="modal-close" onclick="closeHistoryModal()">✕</button>
+        </div>
+        <div id="modal-body"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── PAGE: SYSTEM INFO ─────────────────────────────────────────────── -->
+  <section class="page" id="page-system">
+    <div class="page-header">
+      <h1>System Information</h1>
+      <p class="page-sub">Cryptographic environment and mode availability on this deployment.</p>
+    </div>
+
+    <div id="system-loading" class="card"><div class="empty-state">Loading capabilities…</div></div>
+    <div id="system-content" style="display:none">
+
+      <!-- Mode availability cards -->
+      <div class="card">
+        <div class="card-title">Cryptographic Mode Availability</div>
+        <div id="mode-availability-grid"></div>
+      </div>
+
+      <!-- OpenSSL details -->
+      <div class="card">
+        <div class="card-title">OpenSSL / TLS Environment</div>
+        <div id="openssl-detail-table"></div>
+      </div>
+
+      <!-- Setup instructions -->
+      <div class="card">
+        <div class="card-title">Setup Instructions — Enabling Post-Quantum Modes</div>
+        <div class="setup-instructions" id="setup-instructions">
+          <div class="setup-step">
+            <div class="step-num">1</div>
+            <div class="step-body">
+              <h3>Understand what's required</h3>
+              <p>Post-Quantum TLS (Modes B and C) require OpenSSL 3.0 or later with the
+              <strong>OQS Provider</strong> plugin loaded. Your current Python installation
+              ships with OpenSSL 1.1.1, which was released before PQC standardisation.</p>
+            </div>
+          </div>
+          <div class="setup-step">
+            <div class="step-num">2</div>
+            <div class="step-body">
+              <h3>Docker deployment (recommended path)</h3>
+              <p>The included <code>Dockerfile</code> is based on Ubuntu 22.04 with OpenSSL 3.x.
+              Build and run the container, then install oqs-provider inside it, or use the
+              <a href="https://hub.docker.com/r/openquantumsafe/curl" target="_blank">openquantumsafe/curl</a>
+              base image which already includes liboqs.</p>
+              <pre>docker build -t pqc-lab .
+docker run -p 5000:5000 pqc-lab</pre>
+            </div>
+          </div>
+          <div class="setup-step">
+            <div class="step-num">3</div>
+            <div class="step-body">
+              <h3>Ubuntu 22.04 / EC2 setup</h3>
+              <p>On an Ubuntu VM, run the cloud setup script:</p>
+              <pre>bash scripts/cloud_setup.sh</pre>
+              <p>This installs OpenSSL 3.x, liboqs, oqs-provider, and the Python environment.</p>
+            </div>
+          </div>
+          <div class="setup-step">
+            <div class="step-num">4</div>
+            <div class="step-body">
+              <h3>Verify PQC availability</h3>
+              <p>After setup, restart the application and check this page again.
+              Modes B and C should show <span class="badge-available-inline">Available</span>.</p>
+              <p>Alternatively, from the command line:</p>
+              <pre>openssl list -kem-algorithms | grep mlkem</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ── PAGE: LEARN ───────────────────────────────────────────────────── -->
+  <section class="page" id="page-learn">
+    <div class="page-header">
+      <h1>Learn</h1>
+      <p class="page-sub">Beginner-friendly explanations of the cryptographic concepts behind this project.</p>
+    </div>
+
+    <div class="learn-grid">
+
+      <div class="card learn-card">
+        <div class="learn-icon">🔒</div>
+        <h2>What is TLS?</h2>
+        <p><strong>TLS (Transport Layer Security)</strong> is the protocol that puts the "S" in HTTPS.
+        Every time you visit a secure website, your browser and the server run a TLS handshake to:</p>
+        <ul>
+          <li>Authenticate the server (using a digital certificate)</li>
+          <li>Agree on a shared secret key without ever sending it over the network</li>
+          <li>Use that key to encrypt all data exchanged</li>
+        </ul>
+        <p>TLS 1.3 (2018) is the current standard. It is faster and more secure than older versions.</p>
+      </div>
+
+      <div class="card learn-card">
+        <div class="learn-icon">🔑</div>
+        <h2>Classical Cryptography (X25519)</h2>
+        <p>Today's internet uses <strong>elliptic-curve Diffie-Hellman (ECDH)</strong> for key exchange.
+        X25519 is the most popular variant.</p>
+        <p>The security of ECDH relies on the <em>Elliptic Curve Discrete Logarithm Problem</em> —
+        a mathematical problem that classical computers cannot solve in reasonable time,
+        but that a sufficiently powerful <strong>quantum computer</strong> could solve using
+        Shor's algorithm.</p>
+        <p>This is why we need post-quantum alternatives.</p>
+      </div>
+
+      <div class="card learn-card">
+        <div class="learn-icon">⚛</div>
+        <h2>Post-Quantum Cryptography</h2>
+        <p>Post-quantum cryptography (PQC) uses mathematical problems that are believed to be hard
+        for <em>both</em> classical and quantum computers.</p>
+        <p>In 2024, NIST published <strong>FIPS 203 (ML-KEM)</strong>, the first standardised
+        post-quantum key-encapsulation mechanism. ML-KEM is based on the hardness of
+        <em>Module Learning With Errors (MLWE)</em> — a lattice problem.</p>
+        <p><a href="https://csrc.nist.gov/pubs/fips/203/final" target="_blank">NIST FIPS 203 →</a></p>
+      </div>
+
+      <div class="card learn-card">
+        <div class="learn-icon">🔮</div>
+        <h2>What is ML-KEM?</h2>
+        <p><strong>ML-KEM (Module Lattice Key Encapsulation Mechanism)</strong> is a KEM, not a full
+        TLS cipher. In TLS, it replaces only the key-exchange step (deciding the shared secret).
+        The bulk encryption algorithm (AES-GCM) stays the same.</p>
+        <p>ML-KEM comes in three security levels:</p>
+        <ul>
+          <li><strong>ML-KEM-512</strong> — Level 1 (roughly equivalent to AES-128)</li>
+          <li><strong>ML-KEM-768</strong> — Level 3 (roughly AES-192) ← we use this</li>
+          <li><strong>ML-KEM-1024</strong> — Level 5 (roughly AES-256)</li>
+        </ul>
+        <p>The trade-off: ML-KEM key material is larger than X25519 (1184 bytes vs 32 bytes),
+        which may slightly increase handshake size.</p>
+      </div>
+
+      <div class="card learn-card">
+        <div class="learn-icon">🛡</div>
+        <h2>Hybrid Key Exchange</h2>
+        <p>A <strong>hybrid</strong> approach combines X25519 <em>and</em> ML-KEM-768 in the same
+        handshake. The shared secret is derived from <em>both</em> algorithms combined.</p>
+        <p>This is the <strong>recommended migration strategy</strong> because:</p>
+        <ul>
+          <li>If ML-KEM has an undiscovered flaw, X25519 still protects you.</li>
+          <li>If X25519 is broken by a quantum computer, ML-KEM still protects you.</li>
+          <li>Both algorithms must be broken simultaneously to compromise the session.</li>
+        </ul>
+        <p>The IETF defines the hybrid group <code>X25519MLKEM768</code> in an active draft.</p>
+      </div>
+
+      <div class="card learn-card">
+        <div class="learn-icon">⏱</div>
+        <h2>Handshake Latency</h2>
+        <p><strong>Handshake latency</strong> is the time (in milliseconds) from when the client
+        starts the SSL wrap until the TLS Finished message is received and keys are derived.</p>
+        <p>This platform measures:</p>
+        <ul>
+          <li><strong>TLS handshake time</strong> — the cryptographic operation itself</li>
+          <li><strong>TCP connect time</strong> — recorded separately but NOT included in reported latency</li>
+        </ul>
+        <p>We use Python's <code>time.monotonic()</code> which is a high-resolution clock
+        that never goes backward — safe for performance measurement.</p>
+      </div>
+
+      <div class="card learn-card">
+        <div class="learn-icon">📊</div>
+        <h2>Why Migration Benchmarking Matters</h2>
+        <p>Organisations cannot upgrade to post-quantum cryptography overnight because:</p>
+        <ul>
+          <li>PQC algorithms are newer and less battle-tested.</li>
+          <li>Larger key sizes may impact performance on constrained devices.</li>
+          <li>Hybrid modes add overhead but reduce risk during the transition period.</li>
+          <li>Operators need real performance data to justify and plan upgrades.</li>
+        </ul>
+        <p>This platform lets you measure those trade-offs in a controlled way and build an
+        evidence base for migration decisions — which is exactly what NIST and industry
+        guidance recommends.</p>
+      </div>
+
+      <div class="card learn-card">
+        <div class="learn-icon">🌩</div>
+        <h2>Harvest Now, Decrypt Later</h2>
+        <p>Even if quantum computers powerful enough to break encryption don't exist today,
+        an adversary could <strong>record your encrypted traffic now</strong> and
+        decrypt it later once they have a quantum computer.</p>
+        <p>This is called "Harvest Now, Decrypt Later" (HNDL) and is the reason migration
+        is urgent for data that must remain confidential for 10+ years
+        (government, medical, financial records).</p>
+        <p>Post-quantum key exchange addresses this threat because even future quantum computers
+        cannot break ML-KEM with known algorithms.</p>
+      </div>
+
+    </div>
+  </section>
+
+</main>
+
+<script src="/static/js/app.js"></script>
+</body>
+</html>

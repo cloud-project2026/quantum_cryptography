@@ -1,0 +1,33 @@
+# Post-Quantum Cryptography Migration Platform
+# Python dependencies — pinned to exact versions for reproducibility
+
+# ── Web framework ─────────────────────────────────────────────────────────
+flask==3.0.3
+flask-cors==5.0.0
+python-dotenv==1.0.1
+
+# ── Production WSGI server ────────────────────────────────────────────────
+# Never use Flask's dev server in production.
+gunicorn==22.0.0
+
+# ── Cryptography ──────────────────────────────────────────────────────────
+# Used for generating the self-signed certificate for the loopback server.
+cryptography==43.0.3
+
+# ── HTTP client ───────────────────────────────────────────────────────────
+requests==2.32.3
+
+# ── System monitoring ─────────────────────────────────────────────────────
+psutil==6.1.0
+
+# ── Testing ───────────────────────────────────────────────────────────────
+pytest==8.3.3
+pytest-asyncio==0.24.0
+
+# ── Optional PQC ──────────────────────────────────────────────────────────
+# liboqs-python provides Python bindings to the Open Quantum Safe liboqs library.
+# Uncomment if you have liboqs installed on your system:
+#   - Ubuntu: follow docs/setup.md for building liboqs from source
+#   - Docker: use the oqs-enabled base image or the install_oqs_provider.sh script
+#
+# liboqs-python==0.10.1   # requires liboqs native library (not available on Windows by default)

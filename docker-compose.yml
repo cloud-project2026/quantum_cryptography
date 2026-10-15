@@ -1,0 +1,50 @@
+version: "3.9"
+
+# ──────────────────────────────────────────────────────────────────────────
+# docker-compose.yml — PQC Migration Platform
+# ──────────────────────────────────────────────────────────────────────────
+#
+# Usage:
+#   docker compose up --build          # build and start
+#   docker compose up -d               # run in background
+#   docker compose logs -f             # stream logs
+#   docker compose down                # stop and remove containers
+#   docker compose down -v             # also remove volumes (clears DB)
+# ──────────────────────────────────────────────────────────────────────────
+
+services:
+  pqc-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pqc-migration-app
+    ports:
+      - "${PORT:-5000}:5000"
+    environment:
+      - PORT=5000
+      - ENV=${ENV:-production}
+      - SECRET_KEY=${SECRET_KEY:-change-this-in-production-use-random-string}
+      - DATABASE_PATH=/app/results/experiments.db
+      - START_LOOPBACK_SERVER=${START_LOOPBACK_SERVER:-true}
+      - ALLOWED_BENCHMARK_HOSTS=${ALLOWED_BENCHMARK_HOSTS:-localhost,127.0.0.1,example.com}
+      - MAX_REPETITIONS=${MAX_REPETITIONS:-200}
+      - MAX_CONCURRENCY=${MAX_CONCURRENCY:-20}
+    volumes:
+      # Persist the SQLite database across container restarts
+      - pqc-results:/app/results
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  pqc-results:
+    driver: local
