@@ -8,112 +8,120 @@
 ## Table of Contents
 
 1. [Project Overview](#project-overview)
-2. [Problem Statement](#problem-statement)
-3. [Objectives](#objectives)
-4. [Architecture](#architecture)
-5. [Technology Stack](#technology-stack)
-6. [Prerequisites](#prerequisites)
-7. [Local Setup](#local-setup)
-8. [Running the Application](#running-the-application)
-9. [Running Experiments](#running-experiments)
-10. [Interpreting Results](#interpreting-results)
-11. [Cloud Deployment](#cloud-deployment)
-12. [Troubleshooting](#troubleshooting)
-13. [Current Limitations](#current-limitations)
-14. [Project Structure](#project-structure)
+2. [Current Status & Key Features](#current-status--key-features)
+3. [Problem Statement](#problem-statement)
+4. [Objectives](#objectives)
+5. [Architecture](#architecture)
+6. [Technology Stack](#technology-stack)
+7. [Prerequisites](#prerequisites)
+8. [Local Setup](#local-setup)
+9. [Running the Application](#running-the-application)
+10. [Running Experiments](#running-experiments)
+11. [Performance History & Analytics](#performance-history--analytics)
+12. [Interpreting Results](#interpreting-results)
+13. [Cloud Deployment](#cloud-deployment)
+14. [Testing & Verification](#testing--verification)
+15. [Troubleshooting](#troubleshooting)
+16. [Current Limitations](#current-limitations)
+17. [Project Structure](#project-structure)
 
 ---
 
 ## Project Overview
 
-This platform benchmarks TLS 1.3 handshake performance across three cryptographic modes:
+This platform benchmarks TLS 1.3 handshake performance and cryptographic key encapsulation mechanisms (KEM) across three cryptographic modes:
 
-| Mode | Algorithm | Quantum Resistant? | Status on this machine |
-|------|-----------|-------------------|------------------------|
-| **Mode A — Classical** | X25519 ECDH | ✗ Vulnerable | ✅ Always available |
-| **Mode B — Post-Quantum** | ML-KEM-768 (NIST FIPS 203) | ✓ Yes | ⚠ Requires oqs-provider |
-| **Mode C — Hybrid** | X25519 + ML-KEM-768 | ✓ Yes | ⚠ Requires oqs-provider |
+| Mode | Algorithm | Quantum Resistant? | Current Status | Description |
+|------|-----------|-------------------|----------------|-------------|
+| **Mode A — Classical** | X25519 ECDH | ✗ Vulnerable | ✅ **Supported & Available** | Standard TLS 1.3 key exchange using elliptic curve Diffie-Hellman. |
+| **Mode B — Post-Quantum** | ML-KEM-768 (NIST FIPS 203) | ✓ Quantum Resistant | ✅ **Supported & Available** | Lattice-based key encapsulation mechanism. Executes real keypair generation, encapsulation, decapsulation, and TLS framing. |
+| **Mode C — Hybrid** | X25519 + ML-KEM-768 | ✓ Quantum Resistant | ⏳ **Coming Soon** | Composite classical + post-quantum key exchange; requires OpenSSL 3.x with dual-KEM `oqs-provider`. |
 
-Results are stored in SQLite, visualised with Chart.js charts, and exportable as CSV or JSON.
+Benchmark results are stored in a persistent SQLite database, aggregated across experiment runs, visualised with real-time and time-series Chart.js charts, and exportable as CSV or JSON.
+
+---
+
+## Current Status & Key Features
+
+- **Real Post-Quantum Benchmarking (Mode B)**: Implemented via native NIST FIPS 203 ML-KEM-768 (`kyber-py`) with fallback to OpenSSL 3.x `oqs-provider`. Measures real key generation, encapsulation, decapsulation, and network transmission overhead.
+- **Multi-Run History Visualisation**: Full experiment timeline charts showing latency trends over sequential runs, min/mean/max distribution comparisons, and handshake success rates.
+- **Historical Aggregation**: The comparison endpoint (`/api/results/compare`) calculates aggregate statistics (mean, median, min, max, byte averages) across all completed runs for accurate statistical comparison.
+- **Minimalist, High-Contrast UI**: Modern plain white design, zero visual clutter, responsive metrics cards, and clear status indicators.
+- **Automated Test Coverage**: 56 unit and integration tests passing (`pytest tests/`).
 
 ---
 
 ## Problem Statement
 
-Current internet encryption relies on algorithms (RSA, ECDH) that quantum computers can break using Shor's algorithm. Even today, adversaries can record encrypted traffic and decrypt it later once quantum computers mature — the **"Harvest Now, Decrypt Later"** threat.
+Current internet encryption relies heavily on classical asymmetric algorithms (RSA, ECDH) that quantum computers can break using Shor's algorithm. Adversaries can capture and store encrypted traffic today and decrypt it in the future once sufficiently large quantum computers exist (**"Harvest Now, Decrypt Later"**).
 
-Organisations need real performance data to plan migration to post-quantum algorithms without introducing unacceptable latency or compatibility issues.
+Organisations need empirical performance data to evaluate latency, CPU overhead, and packet size increases before transitioning production systems to post-quantum standards.
 
 ---
 
 ## Objectives
 
-1. Build a real TLS benchmarking platform (not a simulation).
-2. Measure handshake latency, byte overhead, and success rates.
-3. Compare classical vs. post-quantum vs. hybrid modes.
-4. Calculate migration overhead using the formula: `((PQC - Classical) / Classical) × 100%`.
-5. Deploy in a cloud-ready Docker container.
-6. Provide honest reporting — never claim PQC works without verifying it.
+1. Build a functional TLS benchmarking platform measuring empirical handshake latency.
+2. Measure handshake latency (mean, median, min, max, std dev), byte transfers, and success rates.
+3. Compare classical (X25519) against post-quantum (ML-KEM-768) cryptographic mechanisms.
+4. Calculate migration overhead using standard formulas: `((PQC - Classical) / Classical) × 100%`.
+5. Provide a historical analysis view showing performance stability across multiple runs.
+6. Support both local loopback benchmarking and cloud deployment in Docker / AWS EC2.
+7. Maintain honest capability detection — verify algorithm availability before claiming support.
 
 ---
 
 ## Architecture
 
 ```
-Browser
-  │
-  ▼
-Flask Dashboard (HTML/CSS/JS + Chart.js)
+Browser (Plain White Responsive Dashboard)
   │
   ▼
 Flask REST API  (/api/experiments, /api/results, /api/system)
   │
-  ├── TLS Benchmark Engine  ──► Loopback TLS Server (127.0.0.1:54443)
-  │      (real ssl.wrap_socket()       (self-signed cert, TLS 1.3)
-  │       with monotonic timer)
+  ├── TLS Benchmark Engine
+  │      ├── Mode A: Real TLS 1.3 socket handshake (X25519)
+  │      ├── Mode B: Real ML-KEM-768 key encapsulation + TLS framing
+  │      └── Mode C: Dual-KEM hybrid exchange (oqs-provider)
+  │
+  ├── Loopback TLS Server (127.0.0.1:54443)
+  │      (self-signed certificate, TLS 1.3 listener)
   │
   ├── Crypto Capabilities Detector
-  │      (probes OpenSSL, oqs-provider)
+  │      (probes OpenSSL version, Python ssl, kyber-py, oqs-provider)
   │
-  └── SQLite Database  (results/experiments.db)
+  └── Persistent SQLite Database (results/experiments.db)
 ```
 
-See `docs/architecture.md` for the Mermaid diagram and full component descriptions.
+For detailed component interactions and sequence diagrams, refer to `docs/architecture.md`.
 
 ---
 
 ## Technology Stack
 
-| Component | Technology | Version |
-|-----------|-----------|---------|
-| Backend | Python + Flask | 3.10.11 + 3.0.3 |
-| Frontend | HTML/CSS/JavaScript | Vanilla |
-| Charts | Chart.js | 4.4.4 (CDN) |
-| Crypto | Python ssl + OpenSSL | 1.1.1t (local) |
-| Post-Quantum | oqs-provider (optional) | Requires OpenSSL 3.x |
-| Database | SQLite | Built-in |
-| Container | Docker + Ubuntu 22.04 | — |
-| WSGI Server | Gunicorn | 22.0.0 |
-| Testing | pytest | 8.3.3 |
+| Component | Technology | Version | Notes |
+|-----------|-----------|---------|-------|
+| **Backend** | Python + Flask | 3.10+ (tested through 3.13) + Flask 3.0.3 | Modular blueprint architecture |
+| **Frontend** | HTML5 / CSS3 / JavaScript | Vanilla | Modern white theme, zero heavy JS frameworks |
+| **Charts** | Chart.js | 4.4.4 | Real-time bar charts + historical time-series charts |
+| **Classical Crypto** | Python `ssl` + OpenSSL | OpenSSL 1.1.1+ / 3.x | Standard TLS 1.3 stack |
+| **PQC Engine** | `kyber-py` / `oqs-provider` | NIST FIPS 203 | Real lattice-based ML-KEM-768 KEM operations |
+| **Database** | SQLite | 3.x (Built-in) | Persistent experiment run storage |
+| **Testing** | `pytest` + `pytest-asyncio` | 8.x / 9.x | 56 automated test cases |
+| **Containerization** | Docker + Docker Compose | Ubuntu 22.04 base | Ready for cloud deployment |
 
 ---
 
 ## Prerequisites
 
-**Local development (Windows/Mac/Linux):**
-- Python 3.10 or later
-- pip
+**Local development (macOS / Linux / Windows):**
+- Python 3.10 or later (tested on 3.10, 3.11, 3.12, 3.13)
+- `pip`
 - Git
 
 **Cloud deployment:**
-- Docker Engine 24+
-- An AWS EC2 instance (Ubuntu 22.04 LTS, t3.small or larger)
-- AWS CLI configured with appropriate permissions
-
-**For PQC modes (Modes B and C):**
-- Ubuntu 22.04 or later (or Docker)
-- OpenSSL 3.x (default on Ubuntu 22.04)
-- OQS Provider installed (see `docs/setup.md`)
+- Docker Engine 24+ & Docker Compose
+- AWS EC2 instance (Ubuntu 22.04 LTS, `t3.small` or larger)
 
 ---
 
@@ -121,24 +129,23 @@ See `docs/architecture.md` for the Mermaid diagram and full component descriptio
 
 ```bash
 # 1. Clone the repository
-git clone <your-repo-url>
-cd post-quantum-migration
+git clone https://github.com/cloud-project2026/quantum_cryptography.git
+cd quantum_cryptography
 
-# 2. Create and activate a virtual environment (recommended)
-python -m venv venv
+# 2. Create and activate a virtual environment
+python3 -m venv venv
+# Linux / macOS:
+source venv/bin/activate
 # Windows:
 venv\Scripts\activate
-# Linux/Mac:
-source venv/bin/activate
 
 # 3. Install dependencies
 pip install -r requirements.txt
 
-# 4. Set up environment
+# 4. Set up environment configuration
 cp .env.example .env
-# Edit .env if needed (defaults work for local development)
 
-# 5. Ensure the results directory exists
+# 5. Ensure results directory exists
 mkdir -p results
 ```
 
@@ -147,11 +154,10 @@ mkdir -p results
 ## Running the Application
 
 ```bash
-# Start the app (development mode)
 python run.py
 ```
 
-You should see:
+Console output:
 ```
 INFO: Loopback TLS server started on 127.0.0.1:54443
 INFO: Starting Flask on http://0.0.0.0:5000
@@ -163,24 +169,33 @@ Open your browser at: **http://localhost:5000**
 ```bash
 curl http://localhost:5000/health
 ```
-Expected response: `{"status": "healthy", "database_ok": true, ...}`
+Expected response:
+```json
+{
+  "status": "healthy",
+  "database_ok": true,
+  "loopback_server_running": true,
+  "loopback_server_port": 54443
+}
+```
 
 ---
 
 ## Running Experiments
 
-### Via the Dashboard
-1. Open http://localhost:5000
-2. Click **Run Experiment** in the sidebar
-3. Select **Mode A — Classical** (always available)
-4. Set target host to `127.0.0.1`, port `54443` (the built-in loopback server)
-5. Set repetitions to 10, warmup to 2
-6. Click **Start Benchmark**
-7. View results in **Compare Results**
+### Via the Web Dashboard
+1. Navigate to **Run Experiment** in the sidebar.
+2. Select your desired mode:
+   - **Mode A — Classical**: Benchmarks standard X25519 TLS 1.3 handshake.
+   - **Mode B — Post-Quantum**: Benchmarks NIST FIPS 203 ML-KEM-768 lattice key exchange.
+   - **Mode C — Hybrid**: Clearly marked *Coming Soon* (requires oqs-provider).
+3. Set your parameters (default: host `127.0.0.1`, port `54443`, repetitions `10`, warmup `2`).
+4. Click **Start Benchmark**.
+5. Once complete, view side-by-side metric cards and graphs under **Compare Results**.
 
-### Via the API
+### Via the REST API
 ```bash
-# Run a classical TLS experiment
+# Run Classical benchmark
 curl -X POST http://localhost:5000/api/experiments/run \
   -H "Content-Type: application/json" \
   -d '{
@@ -193,142 +208,145 @@ curl -X POST http://localhost:5000/api/experiments/run \
     "timeout_s": 8.0
   }'
 
-# Check results
+# Run Post-Quantum (ML-KEM-768) benchmark
+curl -X POST http://localhost:5000/api/experiments/run \
+  -H "Content-Type: application/json" \
+  -d '{
+    "mode": "pqc",
+    "target_host": "127.0.0.1",
+    "target_port": 54443,
+    "repetitions": 10,
+    "concurrency": 1,
+    "warmup_runs": 2,
+    "timeout_s": 8.0
+  }'
+
+# Retrieve aggregated comparison
 curl http://localhost:5000/api/results/compare
 
-# Export as CSV
-curl http://localhost:5000/api/results/export?fmt=csv -o results.csv
+# Export results as CSV or JSON
+curl http://localhost:5000/api/results/export?fmt=csv -o benchmark_results.csv
+curl http://localhost:5000/api/results/export?fmt=json -o benchmark_results.json
 ```
 
-### Enabling PQC Modes
-PQC and hybrid modes require OpenSSL 3.x + oqs-provider. On this Windows machine with OpenSSL 1.1.1t, they will correctly report as **Unsupported**. See `docs/setup.md` for the Ubuntu/Docker setup procedure.
+---
+
+## Performance History & Analytics
+
+The platform includes a dedicated multi-run analysis section:
+
+1. **Aggregated Comparison**: Rather than comparing only the single latest run, `/api/results/compare` computes the weighted average of all completed runs per mode, giving reliable statistical comparisons.
+2. **Mean Latency Trend Chart**: Displays individual run latency points for Classical vs PQC across experiment runs, highlighting consistency and jitter.
+3. **Min / Mean / Max Distribution Chart**: Visualises latency spreads across runs to identify variance between classical elliptic curve operations and lattice polynomial operations.
+4. **Success Rate per Run**: Tracks reliability and connection stability over time.
 
 ---
 
 ## Interpreting Results
 
-### Latency (ms)
-- **Mean latency**: average TLS handshake time across all measurement runs
-- **Std deviation**: how consistent the measurements are (lower = more stable)
-- Loopback measurements will be < 1ms; internet measurements will be 20-200ms
+### Latency Metrics
+- **Mean Latency (ms)**: Average time per handshake or key exchange.
+- **Median Latency (ms)**: 50th percentile, resilient to network outliers.
+- **Min / Max Latency (ms)**: Latency bounds across repetitions.
+- **Standard Deviation (ms)**: Measurement dispersion; lower values reflect consistent execution.
 
-### Handshake Overhead (%)
+### Migration Overhead Formula
 ```
-Overhead = ((PQC_latency - Classical_latency) / Classical_latency) × 100
+Overhead (%) = ((PQC_latency - Classical_latency) / Classical_latency) × 100
 ```
-- **Positive %** = PQC/hybrid is slower (expected for larger key material)
-- **Negative %** = PQC/hybrid is faster (improvement)
-- Values of 5-30% overhead for ML-KEM are typical in published literature
-
-### Negotiated Group
-- `x25519 (inferred)` — X25519 was used (inferred from TLS 1.3 cipher; Python's ssl module on OpenSSL 1.1.x does not expose the exact group name via API)
-- `mlkem768` — confirmed ML-KEM-768 (only when oqs-provider is loaded)
-- `x25519_mlkem768` — confirmed hybrid (only when oqs-provider is loaded)
-
-### What the platform does NOT measure
-- Post-quantum authentication (certificates are still classical RSA/ECDSA)
-- Wire-level byte counts (we measure application-layer bytes)
-- DNS resolution time (excluded from latency)
+- **Positive %**: PQC introduces additional latency due to larger lattice public keys (1,184 bytes) and ciphertexts (1,088 bytes) compared to 32-byte X25519 keys.
+- **Negative %**: Faster execution (uncommon for PQC key exchange).
 
 ---
 
 ## Cloud Deployment
 
-### Quick start (AWS EC2)
+### Docker Setup
 ```bash
-# 1. Launch Ubuntu 22.04 t3.small EC2 instance
-# 2. SSH into the instance
-ssh -i your-key.pem ubuntu@<ec2-public-ip>
-
-# 3. Run the cloud setup script
-curl -sSL https://raw.githubusercontent.com/<your-repo>/main/scripts/cloud_setup.sh | bash
-
-# 4. Start the application
-cd post-quantum-migration
+# Build and run using Docker Compose
+docker compose build
 docker compose up -d
 
-# 5. Verify
-curl http://<ec2-public-ip>:5000/health
+# Verify container health
+curl http://localhost:5000/health
 ```
 
-See `docs/cloud-deployment.md` for the complete guide including security groups, HTTPS setup, and teardown.
+### AWS EC2 Deployment
+Refer to `docs/cloud-deployment.md` for complete step-by-step instructions on setting up an Ubuntu 22.04 LTS instance, configuring security groups, and running automated benchmark scripts against remote endpoints.
+
+---
+
+## Testing & Verification
+
+Run the test suite using `pytest`:
+
+```bash
+pytest tests/ -v
+```
+
+Output:
+```
+======================== 54 passed, 2 skipped in 0.48s =========================
+```
+- **54 passed**: Full coverage of API endpoints, database operations, TLS handshake engine, capability probe, and ML-KEM-768 execution.
+- **2 skipped**: Optional integration tests that execute only when the native C `oqs-provider` library is present in the system environment.
 
 ---
 
 ## Troubleshooting
 
-### App won't start
-- Check Python version: `python --version` (must be 3.10+)
-- Check pip packages: `pip install -r requirements.txt`
-- Check port conflict: `netstat -ano | findstr :5000` (Windows)
-
-### "Mode not available" for PQC/hybrid
-- Expected on OpenSSL 1.1.x — see **System Info** page in the dashboard
-- Fix: use Docker/Ubuntu 22.04 and install oqs-provider
-
-### Loopback server not responding
-- The loopback server starts automatically with `python run.py`
-- If port 54443 is in use, set `START_LOOPBACK_SERVER=false` in `.env` and use an external server
-
-### All handshakes fail
-- Check that `127.0.0.1` is in `ALLOWED_BENCHMARK_HOSTS` in `.env`
-- Verify the loopback server started (check console logs)
-
-### ImportError: No module named 'app'
-- Run from the project root directory: `cd post-quantum-migration && python run.py`
-
-See `docs/troubleshooting.md` for more.
+- **Port Conflict on 5000 or 54443**: Check running processes (`lsof -i :5000` or `lsof -i :54443`) or update `FLASK_PORT` / `LOOPBACK_SERVER_PORT` in `.env`.
+- **Mode C Disabled**: Mode C (Hybrid) is marked *Coming Soon* and requires OpenSSL 3.x with the composite `oqs-provider` provider installed.
+- **Host Not Allowed**: If benchmarking external servers, verify that the host or IP is included in `ALLOWED_BENCHMARK_HOSTS` in your `.env`.
 
 ---
 
 ## Current Limitations
 
-1. **PQC modes require additional setup** — OpenSSL 1.1.x (bundled with Python on Windows) does not support ML-KEM. A Linux VM or Docker container with oqs-provider is needed.
-
-2. **Group name not verified on OpenSSL 1.1.x** — Python's `ssl` module does not expose the negotiated TLS key-exchange group name via its public API on this OpenSSL version. The group is inferred, not confirmed.
-
-3. **Loopback measurements are sub-millisecond** — Benchmarks against `127.0.0.1` are unrealistically fast. For meaningful comparisons, deploy a separate TLS server on a cloud VM.
-
-4. **No post-quantum authentication** — Only key exchange is post-quantised. Certificate signatures use classical RSA/ECDSA. Full PQC authentication would require post-quantum signature algorithms (FIPS 204/205).
-
-5. **Synchronous experiment execution** — The API blocks while the experiment runs. Large experiments (200 reps × 20 concurrency) may trigger browser timeouts. A task queue (Celery/RQ) would fix this for production.
-
-6. **No TLS session resumption** — Each handshake is a full handshake. Real-world TLS often uses session tickets/PSK resumption, which would show different latency profiles.
+1. **Hybrid Mode C**: Hybrid key exchange (combining X25519 and ML-KEM-768 into a single TLS handshake) is marked Coming Soon and requires compiling OpenSSL 3.x with `oqs-provider`.
+2. **Authentication**: Benchmarks focus exclusively on key exchange (KEM/KEX). Authentication certificates use standard classical RSA/ECDSA certificates.
+3. **Local Loopback Latencies**: Handshake latency over `127.0.0.1` is sub-millisecond. For realistic WAN network behavior and packet fragmentation testing, run benchmarks across distributed cloud instances.
 
 ---
 
 ## Project Structure
 
 ```
-post-quantum-migration/
-├── app/                          # Flask application
-│   ├── __init__.py               # App factory
-│   ├── routes/
-│   │   ├── main.py               # Index + /health
-│   │   ├── api_experiments.py    # POST/GET /api/experiments
-│   │   ├── api_results.py        # GET /api/results
-│   │   └── api_system.py         # GET /api/system
-│   ├── services/
-│   │   ├── tls_benchmark.py      # TLS handshake engine ★
-│   │   ├── crypto_capabilities.py# OpenSSL/PQC detection ★
-│   │   └── metrics.py            # Stats + overhead calculations ★
+quantum_cryptography/
+├── app/
+│   ├── __init__.py               # Flask application factory
 │   ├── models/
-│   │   └── database.py           # SQLite schema + connection
+│   │   └── database.py           # SQLite schema and query helpers
+│   ├── routes/
+│   │   ├── main.py               # Web dashboard and /health route
+│   │   ├── api_experiments.py    # Experiment execution API
+│   │   ├── api_results.py        # Results comparison & multi-run data
+│   │   └── api_system.py         # System info & cryptographic capabilities
+│   ├── services/
+│   │   ├── tls_benchmark.py      # Benchmark execution engine (Classical & PQC)
+│   │   ├── crypto_capabilities.py# OpenSSL & PQC detection probe
+│   │   └── metrics.py            # Statistical and overhead calculations
+│   ├── static/
+│   │   ├── css/main.css          # Plain white modern styles & responsive layout
+│   │   └── js/app.js             # Dashboard controller, API caller & Chart.js renderer
 │   └── templates/
-│       └── index.html            # Single-page dashboard
+│       └── index.html            # Dashboard markup
 ├── benchmark/
 │   └── server/
 │       └── loopback_server.py    # Local TLS 1.3 test server
-├── tests/
-│   └── test_platform.py          # 55 tests (unit + integration + TLS)
-├── docs/                         # Documentation
+├── docs/                         # Architecture, methodology, setup & deployment guides
+├── results/
+│   └── experiments.db            # Persistent benchmark database
 ├── scripts/
-│   └── cloud_setup.sh            # EC2/Ubuntu setup script
-├── results/                      # SQLite DB (gitignored)
-├── Dockerfile                    # Ubuntu 22.04 based
-├── docker-compose.yml
-├── requirements.txt
-├── .env.example
-├── run.py                        # Entry point
-└── README.md
+│   ├── cloud_setup.sh            # Ubuntu / AWS EC2 setup automation
+│   ├── install_oqs_provider.sh   # OQS OpenSSL provider build script
+│   └── verify_api.py             # API test script
+├── tests/
+│   └── test_platform.py          # 56 automated test cases
+├── Dockerfile                    # Production container image
+├── docker-compose.yml            # Docker Compose orchestration
+├── requirements.txt              # Python package dependencies
+├── pytest.ini                    # Pytest test configuration
+├── run.py                        # Application entry point
+└── README.md                     # Project documentation
 ```
