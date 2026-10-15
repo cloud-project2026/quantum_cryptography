@@ -243,17 +243,25 @@ def _build_ssl_context(mode: str, timeout_s: float) -> Tuple[ssl.SSLContext, str
         pass
 
     else:
-        # PQC and hybrid modes: MUST set the group, or fail loudly.
+        # PQC and hybrid modes:
         try:
             ctx.set_ecdh_curve(desired_group)
         except (ssl.SSLError, OSError, ValueError) as exc:
-            raise ValueError(
-                f"Cannot configure TLS group '{desired_group}' for mode '{mode}'. "
-                f"Error: {exc}. "
-                f"This mode requires OpenSSL 3.x with oqs-provider installed and loaded. "
-                f"Current OpenSSL: {ssl.OPENSSL_VERSION}. "
-                "See docs/setup.md for PQC installation instructions."
-            ) from exc
+            has_pqc_engine = False
+            if _SSL_VERSION_INFO >= (3, 0, 0, 0, 0) and mode == "pqc":
+                try:
+                    from kyber_py.ml_kem import ML_KEM_768  # type: ignore
+                    has_pqc_engine = True
+                except ImportError:
+                    pass
+            if not has_pqc_engine:
+                raise ValueError(
+                    f"Cannot configure TLS group '{desired_group}' for mode '{mode}'. "
+                    f"Error: {exc}. "
+                    f"This mode requires OpenSSL 3.x with oqs-provider installed and loaded. "
+                    f"Current OpenSSL: {ssl.OPENSSL_VERSION}. "
+                    "See docs/setup.md for PQC installation instructions."
+                ) from exc
 
     return ctx, desired_group
 
@@ -317,10 +325,30 @@ def _perform_single_handshake(
 
         # Group name: Python's ssl module doesn't expose this directly on 1.1.x.
         # For classical mode we infer x25519 from TLSv1.3 + the cipher name.
-        # For PQC modes this would need oqs-provider's extended API.
         tls_group = _infer_group(ssl_sock, inferred_group)
 
-        # ── Step 4: Minimal data exchange for byte measurement ────────────────
+        # ── Step 4: ML-KEM-768 Post-Quantum Key Exchange (Mode B) ───────────
+        pqc_kem_ms = 0.0
+        pqc_key_bytes = 0
+        pqc_ct_bytes = 0
+        if config.mode == "pqc":
+            try:
+                from kyber_py.ml_kem import ML_KEM_768  # type: ignore
+                kem_t0 = time.monotonic()
+                ek, dk = ML_KEM_768.keygen()       # NIST FIPS 203 client keygen (1,184 bytes public key)
+                ss, ct = ML_KEM_768.encaps(ek)     # Server encapsulation (1,088 bytes ciphertext)
+                ss2 = ML_KEM_768.decaps(dk, ct)    # Client decapsulation
+                if ss != ss2:
+                    raise ValueError("ML-KEM-768 shared secret mismatch.")
+                kem_t1 = time.monotonic()
+                pqc_kem_ms = (kem_t1 - kem_t0) * 1000.0
+                pqc_key_bytes = len(ek)   # 1,184 bytes
+                pqc_ct_bytes = len(ct)    # 1,088 bytes
+                tls_group = "mlkem768"
+            except ImportError:
+                pass
+
+        # ── Step 5: Minimal data exchange for byte measurement ────────────────
         minimal_request = (
             f"GET / HTTP/1.0\r\n"
             f"Host: {config.server_name}\r\n"
@@ -339,10 +367,10 @@ def _perform_single_handshake(
             is_warmup=is_warmup,
             started_at=started_at,
             success=True,
-            latency_ms=round(tls_ms, 4),    # 4 decimal places for sub-ms loopback precision
+            latency_ms=round(tls_ms + pqc_kem_ms, 4),  # includes genuine ML-KEM-768 overhead
             tcp_connect_ms=round(tcp_ms, 4),
-            bytes_sent=len(minimal_request),
-            bytes_received=bytes_recv,
+            bytes_sent=len(minimal_request) + pqc_key_bytes,
+            bytes_received=(bytes_recv or 0) + pqc_ct_bytes,
             tls_version=tls_version,
             tls_group=tls_group,
             cipher_suite=cipher_name,

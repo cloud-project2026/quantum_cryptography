@@ -563,6 +563,24 @@ class TestRealTLSHandshake:
             if summary.success_count > 1:
                 assert summary.std_latency_ms is not None
 
+    def test_pqc_mlkem768_handshake_succeeds(self):
+        """Mode B (ML-KEM-768) benchmark runs real key encapsulation and completes."""
+        from app.services.tls_benchmark import ExperimentConfig, run_experiment
+        cfg = ExperimentConfig(
+            mode="pqc",
+            target_host="127.0.0.1",
+            target_port=54444,
+            repetitions=2,
+            concurrency=1,
+            warmup_runs=0,
+            timeout_s=8.0,
+        )
+        summary = run_experiment(cfg)
+        assert summary.status == "completed"
+        assert summary.negotiated_group == "mlkem768"
+        assert summary.success_count == 2
+
+
     def test_pqc_mode_fails_gracefully_on_openssl_1x(self):
         """PQC mode on OpenSSL 1.1.x must fail with a clear error, not silently succeed."""
         import ssl

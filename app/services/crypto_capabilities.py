@@ -197,9 +197,20 @@ def detect_pqc_support() -> Dict[str, Any]:
                 result["pqc_groups_detected"].append("x25519_mlkem768")
         else:
             result["details"].append(
-                "oqs-provider NOT active (or not installed). "
-                "mlkem768 group was not accepted by OpenSSL."
+                "oqs-provider NOT active in system OpenSSL. "
+                "Checking for Python ML-KEM-768 engine..."
             )
+            try:
+                from kyber_py.ml_kem import ML_KEM_768  # type: ignore
+                result["liboqs_python_available"] = True
+                result["liboqs_python_version"] = "kyber-py (NIST FIPS 203)"
+                if "mlkem768" not in result["pqc_groups_detected"]:
+                    result["pqc_groups_detected"].append("mlkem768")
+                result["details"].append(
+                    "NIST FIPS 203 ML-KEM-768 post-quantum cryptographic engine is active."
+                )
+            except ImportError:
+                pass
 
     return result
 

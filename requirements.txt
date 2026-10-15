@@ -24,10 +24,13 @@ psutil==6.1.0
 pytest==8.3.3
 pytest-asyncio==0.24.0
 
-# ── Optional PQC ──────────────────────────────────────────────────────────
+# ── Post-Quantum Cryptography (ML-KEM / NIST FIPS 203) ──────────────────────
+kyber-py>=1.2.0
+
 # liboqs-python provides Python bindings to the Open Quantum Safe liboqs library.
 # Uncomment if you have liboqs installed on your system:
 #   - Ubuntu: follow docs/setup.md for building liboqs from source
 #   - Docker: use the oqs-enabled base image or the install_oqs_provider.sh script
 #
 # liboqs-python==0.10.1   # requires liboqs native library (not available on Windows by default)
+

@@ -22,36 +22,29 @@
 ═══════════════════════════════════════════════════════════════════════════ -->
 <aside class="sidebar" id="sidebar">
   <div class="sidebar-logo">
-    <div class="logo-icon">⚛</div>
     <div class="logo-text">
       <span class="logo-title">PQC Lab</span>
-      <span class="logo-sub">v1.0.0</span>
+      <span class="logo-sub">TLS Benchmark Platform</span>
     </div>
   </div>
 
   <nav class="sidebar-nav">
     <button class="nav-item active" data-page="overview" id="nav-overview">
-      <span class="nav-icon">◈</span>
       <span>Overview</span>
     </button>
     <button class="nav-item" data-page="run" id="nav-run">
-      <span class="nav-icon">▶</span>
       <span>Run Experiment</span>
     </button>
     <button class="nav-item" data-page="compare" id="nav-compare">
-      <span class="nav-icon">⊞</span>
       <span>Compare Results</span>
     </button>
     <button class="nav-item" data-page="history" id="nav-history">
-      <span class="nav-icon">◷</span>
       <span>History</span>
     </button>
     <button class="nav-item" data-page="system" id="nav-system">
-      <span class="nav-icon">⚙</span>
       <span>System Info</span>
     </button>
     <button class="nav-item" data-page="learn" id="nav-learn">
-      <span class="nav-icon">◎</span>
       <span>Learn</span>
     </button>
   </nav>
@@ -147,19 +140,16 @@
           <label class="form-label" for="cfg-mode">Cryptographic Mode</label>
           <div class="mode-selector" id="mode-selector">
             <button class="mode-btn active" data-mode="classical" id="mode-btn-classical">
-              <span class="mode-icon">🔐</span>
               <span class="mode-name">Mode A — Classical</span>
               <span class="mode-algo">X25519 / TLS 1.3</span>
               <span class="mode-status-tag" id="mode-tag-classical">Available</span>
             </button>
             <button class="mode-btn" data-mode="pqc" id="mode-btn-pqc">
-              <span class="mode-icon">⚛</span>
               <span class="mode-name">Mode B — Post-Quantum</span>
               <span class="mode-algo">ML-KEM-768</span>
               <span class="mode-status-tag" id="mode-tag-pqc">Checking…</span>
             </button>
             <button class="mode-btn" data-mode="hybrid" id="mode-btn-hybrid">
-              <span class="mode-icon">🛡</span>
               <span class="mode-name">Mode C — Hybrid</span>
               <span class="mode-algo">X25519 + ML-KEM-768</span>
               <span class="mode-status-tag" id="mode-tag-hybrid">Checking…</span>
@@ -176,7 +166,7 @@
 
         <!-- PQC unavailable warning -->
         <div class="alert alert-warning" id="pqc-unavailable-warning" style="display:none">
-          <strong>⚠ This mode is not available on this system.</strong>
+          <strong>This mode is not available on this system.</strong>
           <p id="pqc-unavailable-detail"></p>
           <p>See <strong>System Info</strong> for setup instructions.</p>
         </div>
@@ -220,7 +210,7 @@
         </div>
 
         <button class="btn btn-primary btn-lg" id="start-btn" onclick="startExperiment()">
-          <span id="start-btn-text">▶ Start Benchmark</span>
+          <span id="start-btn-text">Start Benchmark</span>
         </button>
       </div>
 
@@ -284,7 +274,7 @@
           </div>
 
           <div class="alert alert-info" id="run-success-box" style="display:none">
-            <strong>✓ Experiment Complete</strong>
+            <strong>Experiment Complete</strong>
             <p>Results saved. View in <a href="#" onclick="showPage('compare')">Compare Results</a>.</p>
           </div>
         </div>
@@ -300,9 +290,9 @@
     </div>
 
     <div class="toolbar">
-      <button class="btn btn-secondary" onclick="loadComparison()">↻ Refresh</button>
-      <button class="btn btn-secondary" onclick="exportResults('csv')">⬇ Export CSV</button>
-      <button class="btn btn-secondary" onclick="exportResults('json')">⬇ Export JSON</button>
+      <button class="btn btn-secondary" onclick="loadComparison()">Refresh</button>
+      <button class="btn btn-secondary" onclick="exportResults('csv')">Export CSV</button>
+      <button class="btn btn-secondary" onclick="exportResults('json')">Export JSON</button>
     </div>
 
     <!-- Summary table -->
@@ -461,7 +451,6 @@ docker run -p 5000:5000 pqc-lab</pre>
     <div class="learn-grid">
 
       <div class="card learn-card">
-        <div class="learn-icon">🔒</div>
         <h2>What is TLS?</h2>
         <p><strong>TLS (Transport Layer Security)</strong> is the protocol that puts the "S" in HTTPS.
         Every time you visit a secure website, your browser and the server run a TLS handshake to:</p>
@@ -474,7 +463,6 @@ docker run -p 5000:5000 pqc-lab</pre>
       </div>
 
       <div class="card learn-card">
-        <div class="learn-icon">🔑</div>
         <h2>Classical Cryptography (X25519)</h2>
         <p>Today's internet uses <strong>elliptic-curve Diffie-Hellman (ECDH)</strong> for key exchange.
         X25519 is the most popular variant.</p>
@@ -486,18 +474,16 @@ docker run -p 5000:5000 pqc-lab</pre>
       </div>
 
       <div class="card learn-card">
-        <div class="learn-icon">⚛</div>
         <h2>Post-Quantum Cryptography</h2>
         <p>Post-quantum cryptography (PQC) uses mathematical problems that are believed to be hard
         for <em>both</em> classical and quantum computers.</p>
         <p>In 2024, NIST published <strong>FIPS 203 (ML-KEM)</strong>, the first standardised
         post-quantum key-encapsulation mechanism. ML-KEM is based on the hardness of
         <em>Module Learning With Errors (MLWE)</em> — a lattice problem.</p>
-        <p><a href="https://csrc.nist.gov/pubs/fips/203/final" target="_blank">NIST FIPS 203 →</a></p>
+        <p><a href="https://csrc.nist.gov/pubs/fips/203/final" target="_blank">NIST FIPS 203</a></p>
       </div>
 
       <div class="card learn-card">
-        <div class="learn-icon">🔮</div>
         <h2>What is ML-KEM?</h2>
         <p><strong>ML-KEM (Module Lattice Key Encapsulation Mechanism)</strong> is a KEM, not a full
         TLS cipher. In TLS, it replaces only the key-exchange step (deciding the shared secret).
@@ -513,7 +499,6 @@ docker run -p 5000:5000 pqc-lab</pre>
       </div>
 
       <div class="card learn-card">
-        <div class="learn-icon">🛡</div>
         <h2>Hybrid Key Exchange</h2>
         <p>A <strong>hybrid</strong> approach combines X25519 <em>and</em> ML-KEM-768 in the same
         handshake. The shared secret is derived from <em>both</em> algorithms combined.</p>
@@ -527,7 +512,6 @@ docker run -p 5000:5000 pqc-lab</pre>
       </div>
 
       <div class="card learn-card">
-        <div class="learn-icon">⏱</div>
         <h2>Handshake Latency</h2>
         <p><strong>Handshake latency</strong> is the time (in milliseconds) from when the client
         starts the SSL wrap until the TLS Finished message is received and keys are derived.</p>
@@ -541,7 +525,6 @@ docker run -p 5000:5000 pqc-lab</pre>
       </div>
 
       <div class="card learn-card">
-        <div class="learn-icon">📊</div>
         <h2>Why Migration Benchmarking Matters</h2>
         <p>Organisations cannot upgrade to post-quantum cryptography overnight because:</p>
         <ul>
@@ -556,7 +539,6 @@ docker run -p 5000:5000 pqc-lab</pre>
       </div>
 
       <div class="card learn-card">
-        <div class="learn-icon">🌩</div>
         <h2>Harvest Now, Decrypt Later</h2>
         <p>Even if quantum computers powerful enough to break encryption don't exist today,
         an adversary could <strong>record your encrypted traffic now</strong> and

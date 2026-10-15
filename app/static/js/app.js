@@ -18,21 +18,23 @@ const state = {
   lastExperimentId: null,
 };
 
-// Chart.js default configuration for dark theme
+// Chart.js default configuration for light theme
 const CHART_DEFAULTS = {
   plugins: {
-    legend: { labels: { color: '#94a3b8', font: { family: 'Inter', size: 11 } } },
+    legend: { labels: { color: '#334155', font: { family: 'Inter', size: 12, weight: 500 } } },
     tooltip: {
-      backgroundColor: '#111827',
-      borderColor: '#1e3a5f',
+      backgroundColor: '#ffffff',
+      borderColor: '#cbd5e1',
       borderWidth: 1,
-      titleColor: '#e8f0fe',
-      bodyColor: '#94a3b8',
+      titleColor: '#0f172a',
+      bodyColor: '#334155',
+      padding: 10,
+      cornerRadius: 6,
     },
   },
   scales: {
-    x: { ticks: { color: '#64748b' }, grid: { color: '#1e3a5f' } },
-    y: { ticks: { color: '#64748b' }, grid: { color: '#1e3a5f' } },
+    x: { ticks: { color: '#64748b', font: { family: 'Inter', size: 11 } }, grid: { color: '#f1f5f9' } },
+    y: { ticks: { color: '#64748b', font: { family: 'Inter', size: 11 } }, grid: { color: '#f1f5f9' } },
   },
 };
 
@@ -430,8 +432,8 @@ function renderComparisonTable(data) {
 function renderCharts(data) {
   const modes   = ['classical', 'pqc', 'hybrid'];
   const labels  = ['Mode A — Classical', 'Mode B — PQC', 'Mode C — Hybrid'];
-  const colors  = ['#3b82f6', '#06b6d4', '#7c3aed'];
-  const colorsA = ['rgba(59,130,246,0.2)', 'rgba(6,182,212,0.2)', 'rgba(124,58,237,0.2)'];
+  const colors  = ['#2563eb', '#0284c7', '#7c3aed'];
+  const colorsA = ['rgba(37,99,235,0.18)', 'rgba(2,132,199,0.18)', 'rgba(124,58,237,0.18)'];
 
   // Latency chart (bar)
   const latencyVals = modes.map(m => data[m]?.mean_latency_ms ?? null);
@@ -472,8 +474,8 @@ function renderCharts(data) {
   renderBarChart('chart-overhead', overheadLabels, [{
     label: 'Latency Overhead vs. Classical (%)',
     data: overheadData,
-    backgroundColor: overheadData.map(v => v == null ? 'rgba(100,116,139,0.2)' : v > 0 ? 'rgba(239,68,68,0.2)' : 'rgba(16,185,129,0.2)'),
-    borderColor:     overheadData.map(v => v == null ? '#64748b'              : v > 0 ? '#ef4444'               : '#10b981'),
+    backgroundColor: overheadData.map(v => v == null ? 'rgba(100,116,139,0.15)' : v > 0 ? 'rgba(220,38,38,0.18)' : 'rgba(22,163,74,0.18)'),
+    borderColor:     overheadData.map(v => v == null ? '#94a3b8'              : v > 0 ? '#dc2626'               : '#16a34a'),
     borderWidth: 2,
   }], '%');
 }
@@ -637,11 +639,11 @@ async function openHistoryDetail(id) {
       hs.slice(0, 100).forEach(r => {
         html += `<tr>
           <td>${r.run_index}</td>
-          <td>${r.is_warmup ? '<span class="tag" style="background:rgba(100,116,139,0.2);color:#94a3b8">warmup</span>' : 'measure'}</td>
+          <td>${r.is_warmup ? '<span class="tag" style="background:#f1f5f9;color:#475569;border:1px solid #e2e8f0">warmup</span>' : 'measure'}</td>
           <td>${r.latency_ms != null ? r.latency_ms.toFixed(2) : '—'}</td>
           <td>${r.success ? '<span class="td-good">✓</span>' : '<span class="td-bad">✗</span>'}</td>
           <td style="font-size:11px">${r.cipher_suite || '—'}</td>
-          <td style="font-size:11px;color:#fca5a5">${r.error_type ? r.error_type + ': ' + (r.error_detail || '').slice(0,60) : ''}</td>
+          <td style="font-size:11px;color:#b91c1c">${r.error_type ? r.error_type + ': ' + (r.error_detail || '').slice(0,60) : ''}</td>
         </tr>`;
       });
 
@@ -750,7 +752,7 @@ function renderOpenSSLDetails(caps) {
 
   if (pqc.details?.length) {
     table.innerHTML += '<div style="margin-top:12px"><div class="card-title" style="margin-bottom:8px">Detection Notes</div>' +
-      pqc.details.map(d => `<p style="font-size:12px;color:#94a3b8;margin-bottom:6px">• ${d}</p>`).join('') +
+      pqc.details.map(d => `<p style="font-size:12px;color:#475569;margin-bottom:6px">• ${d}</p>`).join('') +
       '</div>';
   }
 }
