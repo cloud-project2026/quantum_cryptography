@@ -1,0 +1,16 @@
+venv/
+.venv/
+env/
+ENV/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+results/*.db
+results/*.db-wal
+results/*.db-shm
+.git/
+.gitignore
+.DS_Store
