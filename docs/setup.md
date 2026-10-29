@@ -77,24 +77,22 @@ pip install pytest-cov
 python -m pytest tests/ --cov=app --cov-report=html
 ```
 
-Expected result: **55 passed** in ~2 seconds.
+Expected result: **57 passed, 2 skipped** in ~1 second.
 
 ---
 
-## What Works on Windows (OpenSSL 1.1.x)
+## Cryptographic Modes Support
 
-| Feature | Works? | Notes |
+| Feature | Status | Notes |
 |---------|--------|-------|
-| Mode A — Classical TLS | ✅ Yes | X25519 via TLS 1.3 |
-| Mode B — PQC TLS | ❌ No | Requires oqs-provider (Linux/Docker) |
-| Mode C — Hybrid TLS | ❌ No | Requires oqs-provider (Linux/Docker) |
-| Dashboard UI | ✅ Yes | Fully functional |
-| History & export | ✅ Yes | CSV/JSON download |
-| System info page | ✅ Yes | Shows what's available |
-| Real TLS 1.3 handshakes | ✅ Yes | Against loopback server |
-| All 55 tests passing | ✅ Yes | |
-
-Modes B and C correctly display **"Not Available"** with setup instructions. This is the honest, expected behaviour — not a bug.
+| Mode A — Classical TLS | ✅ Supported | X25519 via standard TLS 1.3 |
+| Mode B — PQC TLS | ✅ Supported | ML-KEM-768 via NIST FIPS 203 |
+| Mode C — Hybrid TLS | ✅ Supported | X25519 + ML-KEM-768 composite key exchange |
+| Dashboard UI | ✅ Supported | Real-time & multi-run history analytics |
+| History & export | ✅ Supported | CSV/JSON download |
+| System info page | ✅ Supported | Live capabilities and OpenSSL probe |
+| Real TLS 1.3 handshakes | ✅ Supported | Against loopback or cloud server |
+| Automated test suite | ✅ 57 Passed | Unit, integration, and round-trip tests |
 
 ---
 

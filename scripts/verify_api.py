@@ -38,17 +38,41 @@ print('  success_rate_pct:', exp['success_rate_pct'])
 print('  negotiated_tls_ver:', exp['negotiated_tls_ver'])
 print('  negotiated_group:', exp['negotiated_group'])
 
-# Try PQC - should return 422
+# Run PQC experiment (ML-KEM-768)
 r_pqc = requests.post('http://127.0.0.1:5000/api/experiments/run', json={
     'mode': 'pqc',
     'target_host': '127.0.0.1',
     'target_port': 54443,
-    'repetitions': 1,
+    'repetitions': 5,
+    'concurrency': 1,
+    'warmup_runs': 1,
+    'timeout_s': 8.0,
 })
-print('\n=== PQC MODE TEST:')
-print('  HTTP status:', r_pqc.status_code, '(expected 422)')
-pqc_err = r_pqc.json()
-print('  error:', pqc_err.get('error'))
+print('\n=== EXPERIMENT (PQC - ML-KEM-768):')
+print('  HTTP status:', r_pqc.status_code)
+exp_pqc = r_pqc.json()['experiment']
+print('  status:', exp_pqc['status'])
+print('  mean_latency_ms:', exp_pqc['mean_latency_ms'])
+print('  negotiated_group:', exp_pqc['negotiated_group'])
+print('  mean_bytes:', exp_pqc.get('mean_bytes'))
+
+# Run Hybrid experiment (X25519 + ML-KEM-768)
+r_hyb = requests.post('http://127.0.0.1:5000/api/experiments/run', json={
+    'mode': 'hybrid',
+    'target_host': '127.0.0.1',
+    'target_port': 54443,
+    'repetitions': 5,
+    'concurrency': 1,
+    'warmup_runs': 1,
+    'timeout_s': 8.0,
+})
+print('\n=== EXPERIMENT (Hybrid - X25519 + ML-KEM-768):')
+print('  HTTP status:', r_hyb.status_code)
+exp_hyb = r_hyb.json()['experiment']
+print('  status:', exp_hyb['status'])
+print('  mean_latency_ms:', exp_hyb['mean_latency_ms'])
+print('  negotiated_group:', exp_hyb['negotiated_group'])
+print('  mean_bytes:', exp_hyb.get('mean_bytes'))
 
 # Compare
 r4 = requests.get('http://127.0.0.1:5000/api/results/compare')

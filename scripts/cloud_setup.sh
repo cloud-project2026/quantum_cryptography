@@ -23,8 +23,8 @@ GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
 log()  { echo -e "${GREEN}[SETUP]${NC} $*"; }
 warn() { echo -e "${YELLOW}[WARN]${NC}  $*"; }
 
-REPO_URL="${REPO_URL:-https://github.com/<your-username>/post-quantum-migration.git}"
-APP_DIR="${APP_DIR:-/home/ubuntu/post-quantum-migration}"
+REPO_URL="${REPO_URL:-https://github.com/cloud-project2026/quantum_cryptography.git}"
+APP_DIR="${APP_DIR:-/home/ubuntu/quantum_cryptography}"
 
 log "=== PQC Migration Platform — Cloud Setup ==="
 log "EC2 instance: $(curl -s http://169.254.169.254/latest/meta-data/instance-type 2>/dev/null || echo 'unknown')"

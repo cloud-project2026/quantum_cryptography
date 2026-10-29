@@ -88,8 +88,8 @@ docker run hello-world
 
 ```bash
 # Clone your repository
-git clone https://github.com/<your-username>/post-quantum-migration.git
-cd post-quantum-migration
+git clone https://github.com/cloud-project2026/quantum_cryptography.git
+cd quantum_cryptography
 
 # Create your .env file
 cp .env.example .env
@@ -159,9 +159,11 @@ sudo certbot --nginx -d your-domain.com
 
 ---
 
-## Step 5: Enable Post-Quantum Modes (Optional)
+## Step 5: Post-Quantum & Hybrid Modes
 
-To enable Modes B and C, install oqs-provider on Ubuntu 22.04:
+Modes B (ML-KEM-768) and C (Hybrid X25519 + ML-KEM-768) are enabled and fully functional **out-of-the-box** using native NIST FIPS 203 cryptographic engines (`kyber-py` and `cryptography`).
+
+Optionally, for C-native library acceleration using OpenSSL 3.x `oqs-provider` on Ubuntu 22.04:
 
 ```bash
 # Run the automated setup script
@@ -170,8 +172,8 @@ bash scripts/install_oqs_provider.sh
 # Restart the application
 docker compose restart
 
-# Verify PQC available
-curl http://localhost:5000/api/system/capabilities | python3 -m json.tool | grep pqc
+# Verify capabilities
+curl http://localhost:5000/api/system/capabilities | python3 -m json.tool
 ```
 
 ---
@@ -179,7 +181,7 @@ curl http://localhost:5000/api/system/capabilities | python3 -m json.tool | grep
 ## Updating the Deployment
 
 ```bash
-cd post-quantum-migration
+cd quantum_cryptography
 
 # Pull latest code
 git pull origin main
