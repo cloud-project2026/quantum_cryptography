@@ -174,14 +174,7 @@ def detect_pqc_support() -> Dict[str, Any]:
         )
 
     # ── Check OpenSSL version for oqs-provider compatibility ─────────────
-    if not oqs_ver_info["supports_oqs_provider"]:
-        result["details"].append(
-            f"OpenSSL {oqs_ver_info['string']} is version 1.x — "
-            "oqs-provider requires OpenSSL 3.0+. "
-            "PQC TLS groups (mlkem768, x25519_mlkem768) are unavailable on this system. "
-            "See docs/setup.md for upgrade instructions."
-        )
-    else:
+    if oqs_ver_info["supports_oqs_provider"]:
         result["details"].append(
             "OpenSSL 3.x detected — oqs-provider CAN be installed "
             "(but check if it is actually loaded)."
@@ -195,22 +188,36 @@ def detect_pqc_support() -> Dict[str, Any]:
             )
             if _try_set_curve("x25519_mlkem768"):
                 result["pqc_groups_detected"].append("x25519_mlkem768")
-        else:
+    else:
+        result["details"].append(
+            f"OpenSSL {oqs_ver_info['string']} is version 1.x — "
+            "oqs-provider requires OpenSSL 3.0+. "
+            "Using native Python cryptographic engine fallback."
+        )
+
+    # ── Check Python cryptographic engines (kyber-py, cryptography) ────
+    if not result["oqs_provider_configured"]:
+        try:
+            from kyber_py.ml_kem import ML_KEM_768  # type: ignore
+            result["liboqs_python_available"] = True
+            result["liboqs_python_version"] = "kyber-py (NIST FIPS 203)"
+            if "mlkem768" not in result["pqc_groups_detected"]:
+                result["pqc_groups_detected"].append("mlkem768")
             result["details"].append(
-                "oqs-provider NOT active in system OpenSSL. "
-                "Checking for Python ML-KEM-768 engine..."
+                "NIST FIPS 203 ML-KEM-768 post-quantum cryptographic engine is active."
             )
+            # Check for X25519 for Hybrid Mode C
             try:
-                from kyber_py.ml_kem import ML_KEM_768  # type: ignore
-                result["liboqs_python_available"] = True
-                result["liboqs_python_version"] = "kyber-py (NIST FIPS 203)"
-                if "mlkem768" not in result["pqc_groups_detected"]:
-                    result["pqc_groups_detected"].append("mlkem768")
+                from cryptography.hazmat.primitives.asymmetric import x25519  # type: ignore
+                if "x25519_mlkem768" not in result["pqc_groups_detected"]:
+                    result["pqc_groups_detected"].append("x25519_mlkem768")
                 result["details"].append(
-                    "NIST FIPS 203 ML-KEM-768 post-quantum cryptographic engine is active."
+                    "X25519 + ML-KEM-768 hybrid key-exchange engine is active."
                 )
             except ImportError:
                 pass
+        except ImportError:
+            pass
 
     return result
 
@@ -289,10 +296,13 @@ def get_mode_availability() -> Dict[str, Dict[str, Any]]:
     }
 
     # Mode C: Hybrid TLS
+    hybrid_available = pqc["oqs_provider_configured"] or (
+        pqc["liboqs_python_available"] and "x25519_mlkem768" in pqc["pqc_groups_detected"]
+    )
     mode_c = {
         "name": "Mode C — Hybrid TLS (X25519 + ML-KEM-768)",
-        "available": pqc_available,
-        "group": "x25519_mlkem768" if pqc_available else None,
+        "available": hybrid_available,
+        "group": "x25519_mlkem768" if hybrid_available else None,
         "description": (
             "Combines X25519 (classical) with ML-KEM-768 (post-quantum) in a single "
             "key exchange. Both algorithms must be broken for the session to be "
@@ -301,10 +311,10 @@ def get_mode_availability() -> Dict[str, Dict[str, Any]]:
         ),
         "limitations": (
             None
-            if pqc_available
+            if hybrid_available
             else (
-                "Same requirements as Mode B. "
-                "oqs-provider must be installed and loaded in OpenSSL 3.x."
+                "Requires OpenSSL 3.0+ WITH oqs-provider installed, "
+                "OR kyber-py and cryptography packages for Python hybrid KEX engine."
             )
         ),
     }

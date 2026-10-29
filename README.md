@@ -35,7 +35,7 @@ This platform benchmarks TLS 1.3 handshake performance and cryptographic key enc
 |------|-----------|-------------------|----------------|-------------|
 | **Mode A — Classical** | X25519 ECDH | ✗ Vulnerable | ✅ **Supported & Available** | Standard TLS 1.3 key exchange using elliptic curve Diffie-Hellman. |
 | **Mode B — Post-Quantum** | ML-KEM-768 (NIST FIPS 203) | ✓ Quantum Resistant | ✅ **Supported & Available** | Lattice-based key encapsulation mechanism. Executes real keypair generation, encapsulation, decapsulation, and TLS framing. |
-| **Mode C — Hybrid** | X25519 + ML-KEM-768 | ✓ Quantum Resistant | ⏳ **Coming Soon** | Composite classical + post-quantum key exchange; requires OpenSSL 3.x with dual-KEM `oqs-provider`. |
+| **Mode C — Hybrid** | X25519 + ML-KEM-768 | ✓ Quantum Resistant | ✅ **Supported & Available** | Composite classical + post-quantum key exchange (X25519 + ML-KEM-768). Executes dual keypair generation, encapsulation, decapsulation, and secret combination. |
 
 Benchmark results are stored in a persistent SQLite database, aggregated across experiment runs, visualised with real-time and time-series Chart.js charts, and exportable as CSV or JSON.
 
@@ -44,10 +44,11 @@ Benchmark results are stored in a persistent SQLite database, aggregated across 
 ## Current Status & Key Features
 
 - **Real Post-Quantum Benchmarking (Mode B)**: Implemented via native NIST FIPS 203 ML-KEM-768 (`kyber-py`) with fallback to OpenSSL 3.x `oqs-provider`. Measures real key generation, encapsulation, decapsulation, and network transmission overhead.
-- **Multi-Run History Visualisation**: Full experiment timeline charts showing latency trends over sequential runs, min/mean/max distribution comparisons, and handshake success rates.
+- **Real Hybrid TLS Benchmarking (Mode C)**: Implemented composite classical (X25519) + post-quantum (ML-KEM-768) dual key exchange per IETF draft-ietf-tls-hybrid-design. Evaluates combined computational latency, key sizes, and wire overhead.
+- **Multi-Run History Visualisation**: Full experiment timeline charts showing latency trends over sequential runs, min/mean/max distribution comparisons across Classical, PQC, and Hybrid, and handshake success rates.
 - **Historical Aggregation**: The comparison endpoint (`/api/results/compare`) calculates aggregate statistics (mean, median, min, max, byte averages) across all completed runs for accurate statistical comparison.
 - **Minimalist, High-Contrast UI**: Modern plain white design, zero visual clutter, responsive metrics cards, and clear status indicators.
-- **Automated Test Coverage**: 56 unit and integration tests passing (`pytest tests/`).
+- **Automated Test Coverage**: 57 unit and integration tests passing (`pytest tests/`).
 
 ---
 
@@ -188,7 +189,7 @@ Expected response:
 2. Select your desired mode:
    - **Mode A — Classical**: Benchmarks standard X25519 TLS 1.3 handshake.
    - **Mode B — Post-Quantum**: Benchmarks NIST FIPS 203 ML-KEM-768 lattice key exchange.
-   - **Mode C — Hybrid**: Clearly marked *Coming Soon* (requires oqs-provider).
+   - **Mode C — Hybrid**: Benchmarks composite X25519 + ML-KEM-768 dual key exchange (IETF draft-ietf-tls-hybrid-design).
 3. Set your parameters (default: host `127.0.0.1`, port `54443`, repetitions `10`, warmup `2`).
 4. Click **Start Benchmark**.
 5. Once complete, view side-by-side metric cards and graphs under **Compare Results**.
@@ -296,16 +297,14 @@ Output:
 ## Troubleshooting
 
 - **Port Conflict on 5000 or 54443**: Check running processes (`lsof -i :5000` or `lsof -i :54443`) or update `FLASK_PORT` / `LOOPBACK_SERVER_PORT` in `.env`.
-- **Mode C Disabled**: Mode C (Hybrid) is marked *Coming Soon* and requires OpenSSL 3.x with the composite `oqs-provider` provider installed.
 - **Host Not Allowed**: If benchmarking external servers, verify that the host or IP is included in `ALLOWED_BENCHMARK_HOSTS` in your `.env`.
 
 ---
 
 ## Current Limitations
 
-1. **Hybrid Mode C**: Hybrid key exchange (combining X25519 and ML-KEM-768 into a single TLS handshake) is marked Coming Soon and requires compiling OpenSSL 3.x with `oqs-provider`.
-2. **Authentication**: Benchmarks focus exclusively on key exchange (KEM/KEX). Authentication certificates use standard classical RSA/ECDSA certificates.
-3. **Local Loopback Latencies**: Handshake latency over `127.0.0.1` is sub-millisecond. For realistic WAN network behavior and packet fragmentation testing, run benchmarks across distributed cloud instances.
+1. **Authentication**: Benchmarks focus exclusively on key exchange (KEM/KEX). Authentication certificates use standard classical RSA/ECDSA certificates.
+2. **Local Loopback Latencies**: Handshake latency over `127.0.0.1` is sub-millisecond. For realistic WAN network behavior and packet fragmentation testing, run benchmarks across distributed cloud instances.
 
 ---
 

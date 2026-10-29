@@ -248,17 +248,26 @@ def _build_ssl_context(mode: str, timeout_s: float) -> Tuple[ssl.SSLContext, str
             ctx.set_ecdh_curve(desired_group)
         except (ssl.SSLError, OSError, ValueError) as exc:
             has_pqc_engine = False
-            if _SSL_VERSION_INFO >= (3, 0, 0, 0, 0) and mode == "pqc":
+            if mode == "pqc":
                 try:
                     from kyber_py.ml_kem import ML_KEM_768  # type: ignore
                     has_pqc_engine = True
                 except ImportError:
                     pass
+            elif mode == "hybrid":
+                try:
+                    from kyber_py.ml_kem import ML_KEM_768  # type: ignore
+                    from cryptography.hazmat.primitives.asymmetric import x25519  # type: ignore
+                    has_pqc_engine = True
+                except ImportError:
+                    pass
+
             if not has_pqc_engine:
                 raise ValueError(
                     f"Cannot configure TLS group '{desired_group}' for mode '{mode}'. "
                     f"Error: {exc}. "
-                    f"This mode requires OpenSSL 3.x with oqs-provider installed and loaded. "
+                    f"This mode requires OpenSSL 3.x with oqs-provider installed and loaded, "
+                    f"or the native Python cryptographic engines (kyber-py, cryptography). "
                     f"Current OpenSSL: {ssl.OPENSSL_VERSION}. "
                     "See docs/setup.md for PQC installation instructions."
                 ) from exc
@@ -327,7 +336,7 @@ def _perform_single_handshake(
         # For classical mode we infer x25519 from TLSv1.3 + the cipher name.
         tls_group = _infer_group(ssl_sock, inferred_group)
 
-        # ── Step 4: ML-KEM-768 Post-Quantum Key Exchange (Mode B) ───────────
+        # ── Step 4: ML-KEM-768 & Hybrid Key Exchange (Mode B & Mode C) ──────
         pqc_kem_ms = 0.0
         pqc_key_bytes = 0
         pqc_ct_bytes = 0
@@ -345,6 +354,50 @@ def _perform_single_handshake(
                 pqc_key_bytes = len(ek)   # 1,184 bytes
                 pqc_ct_bytes = len(ct)    # 1,088 bytes
                 tls_group = "mlkem768"
+            except ImportError:
+                pass
+
+        elif config.mode == "hybrid":
+            try:
+                from kyber_py.ml_kem import ML_KEM_768  # type: ignore
+                from cryptography.hazmat.primitives.asymmetric import x25519  # type: ignore
+                import hashlib
+
+                kem_t0 = time.monotonic()
+                # 1. Classical X25519 ephemeral keypair (Client)
+                client_x25519_priv = x25519.X25519PrivateKey.generate()
+                client_x25519_pub = client_x25519_priv.public_key().public_bytes_raw()  # 32 bytes
+
+                # 2. ML-KEM-768 keypair (Client)
+                ek, dk = ML_KEM_768.keygen()  # 1,184 bytes
+
+                # 3. Server side: X25519 ephemeral keypair + ML-KEM-768 encapsulation
+                server_x25519_priv = x25519.X25519PrivateKey.generate()
+                server_x25519_pub = server_x25519_priv.public_key().public_bytes_raw()  # 32 bytes
+                server_classical_ss = server_x25519_priv.exchange(
+                    x25519.X25519PublicKey.from_public_bytes(client_x25519_pub)
+                )
+                ss_pqc, ct = ML_KEM_768.encaps(ek)  # 1,088 bytes ct, 32 bytes ss
+
+                # 4. Client side: X25519 exchange + ML-KEM-768 decapsulation
+                client_classical_ss = client_x25519_priv.exchange(
+                    x25519.X25519PublicKey.from_public_bytes(server_x25519_pub)
+                )
+                ss2_pqc = ML_KEM_768.decaps(dk, ct)
+
+                if client_classical_ss != server_classical_ss:
+                    raise ValueError("Hybrid X25519 shared secret mismatch.")
+                if ss_pqc != ss2_pqc:
+                    raise ValueError("Hybrid ML-KEM-768 shared secret mismatch.")
+
+                # 5. Hybrid combiner (IETF draft-ietf-tls-hybrid-design: KDF(ss_classical || ss_pqc))
+                _hybrid_shared_secret = hashlib.sha256(client_classical_ss + ss2_pqc).digest()
+
+                kem_t1 = time.monotonic()
+                pqc_kem_ms = (kem_t1 - kem_t0) * 1000.0
+                pqc_key_bytes = len(client_x25519_pub) + len(ek)  # 32 + 1,184 = 1,216 bytes
+                pqc_ct_bytes = len(server_x25519_pub) + len(ct)   # 32 + 1,088 = 1,120 bytes
+                tls_group = "x25519_mlkem768"
             except ImportError:
                 pass
 

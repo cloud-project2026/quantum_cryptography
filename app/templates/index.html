@@ -97,7 +97,7 @@
       </div>
       <div class="metric-card">
         <div class="metric-label">Hybrid Mode</div>
-        <div class="metric-badge badge-coming-soon" id="ov-hybrid-badge">Coming Soon</div>
+        <div class="metric-badge" id="ov-hybrid-badge">Checking…</div>
         <div class="metric-sub" id="ov-hybrid-sub">X25519 + ML-KEM-768</div>
       </div>
     </div>
@@ -149,10 +149,10 @@
               <span class="mode-algo">ML-KEM-768</span>
               <span class="mode-status-tag" id="mode-tag-pqc">Checking…</span>
             </button>
-            <button class="mode-btn mode-btn-disabled" data-mode="hybrid" id="mode-btn-hybrid" disabled title="Hybrid mode is coming soon — requires oqs-provider">
+            <button class="mode-btn" data-mode="hybrid" id="mode-btn-hybrid">
               <span class="mode-name">Mode C — Hybrid</span>
               <span class="mode-algo">X25519 + ML-KEM-768</span>
-              <span class="mode-status-tag unavail" id="mode-tag-hybrid">Coming Soon</span>
+              <span class="mode-status-tag" id="mode-tag-hybrid">Checking…</span>
             </button>
           </div>
         </div>
@@ -323,10 +323,10 @@
       </div>
     </div>
 
-    <!-- History-based time-series charts (Classical vs PQC per run) -->
+    <!-- History-based time-series charts (Classical vs PQC vs Hybrid per run) -->
     <div class="card" style="padding:20px 24px 8px">
-      <div class="card-title" style="margin-bottom:4px">📈 Performance History — Classical vs PQC Over Time</div>
-      <p class="card-note" style="margin-bottom:16px">Charts below are generated from your full experiment history, showing each run individually so you can see latency trends and differences between Classical and PQC over time.</p>
+      <div class="card-title" style="margin-bottom:4px">📈 Performance History — Classical vs PQC vs Hybrid Over Time</div>
+      <p class="card-note" style="margin-bottom:16px">Charts below are generated from your full experiment history, showing each run individually so you can see latency trends and differences between Classical, Post-Quantum, and Hybrid over time.</p>
     </div>
     <div id="history-charts-section" style="display:contents"></div>
 
@@ -353,6 +353,7 @@
         <option value="">All modes</option>
         <option value="classical">Classical</option>
         <option value="pqc">PQC</option>
+        <option value="hybrid">Hybrid</option>
       </select>
       <button class="btn btn-secondary" onclick="loadHistory()">↻ Refresh</button>
     </div>
