@@ -48,7 +48,7 @@ Benchmark results are stored in a persistent SQLite database, aggregated across 
 - **Multi-Run History Visualisation**: Full experiment timeline charts showing latency trends over sequential runs, min/mean/max distribution comparisons across Classical, PQC, and Hybrid, and handshake success rates.
 - **Historical Aggregation**: The comparison endpoint (`/api/results/compare`) calculates aggregate statistics (mean, median, min, max, byte averages) across all completed runs for accurate statistical comparison.
 - **Minimalist, High-Contrast UI**: Modern plain white design, zero visual clutter, responsive metrics cards, and clear status indicators.
-- **Automated Test Coverage**: 57 unit and integration tests passing (`pytest tests/`).
+- **Automated Test Coverage**: 57 passed, 2 skipped across 59 automated unit and integration tests (`pytest tests/`).
 
 ---
 
@@ -83,7 +83,7 @@ Flask REST API  (/api/experiments, /api/results, /api/system)
   ├── TLS Benchmark Engine
   │      ├── Mode A: Real TLS 1.3 socket handshake (X25519)
   │      ├── Mode B: Real ML-KEM-768 key encapsulation + TLS framing
-  │      └── Mode C: Dual-KEM hybrid exchange (oqs-provider)
+  │      └── Mode C: Real hybrid composite exchange (X25519 + ML-KEM-768)
   │
   ├── Loopback TLS Server (127.0.0.1:54443)
   │      (self-signed certificate, TLS 1.3 listener)
@@ -108,7 +108,7 @@ For detailed component interactions and sequence diagrams, refer to `docs/archit
 | **Classical Crypto** | Python `ssl` + OpenSSL | OpenSSL 1.1.1+ / 3.x | Standard TLS 1.3 stack |
 | **PQC Engine** | `kyber-py` / `oqs-provider` | NIST FIPS 203 | Real lattice-based ML-KEM-768 KEM operations |
 | **Database** | SQLite | 3.x (Built-in) | Persistent experiment run storage |
-| **Testing** | `pytest` + `pytest-asyncio` | 8.x / 9.x | 56 automated test cases |
+| **Testing** | `pytest` + `pytest-asyncio` | 8.x / 9.x | 59 automated test cases (57 passed, 2 skipped) |
 | **Containerization** | Docker + Docker Compose | Ubuntu 22.04 base | Ready for cloud deployment |
 
 ---
@@ -222,12 +222,28 @@ curl -X POST http://localhost:5000/api/experiments/run \
     "timeout_s": 8.0
   }'
 
+# Run Hybrid (X25519 + ML-KEM-768) benchmark
+curl -X POST http://localhost:5000/api/experiments/run \
+  -H "Content-Type: application/json" \
+  -d '{
+    "mode": "hybrid",
+    "target_host": "127.0.0.1",
+    "target_port": 54443,
+    "repetitions": 10,
+    "concurrency": 1,
+    "warmup_runs": 2,
+    "timeout_s": 8.0
+  }'
+
 # Retrieve aggregated comparison
 curl http://localhost:5000/api/results/compare
 
 # Export results as CSV or JSON
 curl http://localhost:5000/api/results/export?fmt=csv -o benchmark_results.csv
 curl http://localhost:5000/api/results/export?fmt=json -o benchmark_results.json
+
+# Run end-to-end API test verification script
+python scripts/verify_api.py
 ```
 
 ---
@@ -237,7 +253,7 @@ curl http://localhost:5000/api/results/export?fmt=json -o benchmark_results.json
 The platform includes a dedicated multi-run analysis section:
 
 1. **Aggregated Comparison**: Rather than comparing only the single latest run, `/api/results/compare` computes the weighted average of all completed runs per mode, giving reliable statistical comparisons.
-2. **Mean Latency Trend Chart**: Displays individual run latency points for Classical vs PQC across experiment runs, highlighting consistency and jitter.
+2. **Mean Latency Trend Chart**: Displays individual run latency points across Classical, PQC, and Hybrid experiment runs, highlighting consistency, variance, and network jitter.
 3. **Min / Mean / Max Distribution Chart**: Visualises latency spreads across runs to identify variance between classical elliptic curve operations and lattice polynomial operations.
 4. **Success Rate per Run**: Tracks reliability and connection stability over time.
 
@@ -250,6 +266,11 @@ The platform includes a dedicated multi-run analysis section:
 - **Median Latency (ms)**: 50th percentile, resilient to network outliers.
 - **Min / Max Latency (ms)**: Latency bounds across repetitions.
 - **Standard Deviation (ms)**: Measurement dispersion; lower values reflect consistent execution.
+
+### Cryptographic Overhead & Sizes
+- **Mode A (Classical X25519)**: 32-byte public key, 32-byte shared secret. Serves as baseline.
+- **Mode B (Post-Quantum ML-KEM-768)**: 1,184-byte public key, 1,088-byte ciphertext, 32-byte shared secret (NIST FIPS 203). Evaluates lattice polynomial computation and packet sizing overhead.
+- **Mode C (Hybrid X25519 + ML-KEM-768)**: 1,216-byte combined public key (32B + 1,184B), 1,120-byte combined ciphertext (32B + 1,088B). Combines both secrets using HKDF-SHA256 into a 32-byte master secret per IETF hybrid draft standards (`draft-ietf-tls-hybrid-design`).
 
 ### Migration Overhead Formula
 ```
@@ -264,7 +285,7 @@ Overhead (%) = ((PQC_latency - Classical_latency) / Classical_latency) × 100
 
 ### Docker Setup
 ```bash
-# Build and run using Docker Compose
+# Build and run using Docker Compose (uses optimized .dockerignore)
 docker compose build
 docker compose up -d
 
@@ -273,7 +294,12 @@ curl http://localhost:5000/health
 ```
 
 ### AWS EC2 Deployment
-Refer to `docs/cloud-deployment.md` for complete step-by-step instructions on setting up an Ubuntu 22.04 LTS instance, configuring security groups, and running automated benchmark scripts against remote endpoints.
+For complete step-by-step setup on an AWS EC2 Ubuntu 22.04 LTS instance, refer to `docs/cloud-deployment.md`. You can also execute the automated one-shot cloud setup script:
+
+```bash
+# Automated EC2 setup and orchestration
+bash scripts/cloud_setup.sh
+```
 
 ---
 
@@ -287,9 +313,9 @@ pytest tests/ -v
 
 Output:
 ```
-======================== 54 passed, 2 skipped in 0.48s =========================
+======================== 57 passed, 2 skipped in 0.40s =========================
 ```
-- **54 passed**: Full coverage of API endpoints, database operations, TLS handshake engine, capability probe, and ML-KEM-768 execution.
+- **57 passed**: Full coverage across Mode A (Classical X25519), Mode B (Post-Quantum ML-KEM-768), and Mode C (Hybrid X25519 + ML-KEM-768), API endpoints, database operations, TLS handshake engine, capability detection probe, and full round-trip execution.
 - **2 skipped**: Optional integration tests that execute only when the native C `oqs-provider` library is present in the system environment.
 
 ---
@@ -322,7 +348,7 @@ quantum_cryptography/
 │   │   ├── api_results.py        # Results comparison & multi-run data
 │   │   └── api_system.py         # System info & cryptographic capabilities
 │   ├── services/
-│   │   ├── tls_benchmark.py      # Benchmark execution engine (Classical & PQC)
+│   │   ├── tls_benchmark.py      # Benchmark execution engine (Classical, PQC & Hybrid)
 │   │   ├── crypto_capabilities.py# OpenSSL & PQC detection probe
 │   │   └── metrics.py            # Statistical and overhead calculations
 │   ├── static/
@@ -339,9 +365,10 @@ quantum_cryptography/
 ├── scripts/
 │   ├── cloud_setup.sh            # Ubuntu / AWS EC2 setup automation
 │   ├── install_oqs_provider.sh   # OQS OpenSSL provider build script
-│   └── verify_api.py             # API test script
+│   └── verify_api.py             # Automated end-to-end API verification script
 ├── tests/
-│   └── test_platform.py          # 56 automated test cases
+│   └── test_platform.py          # 59 automated test cases (57 passed, 2 skipped)
+├── .dockerignore                 # Docker build context exclusions
 ├── Dockerfile                    # Production container image
 ├── docker-compose.yml            # Docker Compose orchestration
 ├── requirements.txt              # Python package dependencies
